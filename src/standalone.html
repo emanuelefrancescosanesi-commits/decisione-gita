@@ -191,7 +191,7 @@ details.import { margin-bottom: 18px; }
   <header>
     <div class="eyebrow">Gita di classe</div>
     <h1>Dove andiamo in gita?</h1>
-    <p class="lead">Scegli sulla mappa i paesi dove vorresti andare, oppure scrivili. Poi copia il messaggio che ti do e mandalo a chi organizza la gita.</p>
+    <p class="lead" id="lead">Scegli sulla mappa i paesi dove vorresti andare, oppure scrivili. Poi copia il messaggio che ti do e mandalo a chi organizza la gita.</p>
     <nav class="tabs" aria-label="Sezioni">
       <button class="tab" id="tab-scegli" type="button" aria-pressed="true">Scegli</button>
       <button class="tab" id="tab-risultati" type="button" aria-pressed="false">Risultati</button>
@@ -251,8 +251,21 @@ details.import { margin-bottom: 18px; }
   </section>
 
   <section id="view-risultati" aria-label="Risultati" hidden>
+    <details class="list import" id="onlinebox" hidden>
+      <summary id="online-sum">Raccolta online</summary>
+      <div class="importin">
+        <p class="hint" id="online-text"></p>
+        <div class="codebtns">
+          <button class="submit" id="online-on" type="button">Attiva la raccolta online</button>
+          <button class="submit" id="online-dl" type="button" hidden>Scarica il file per i compagni</button>
+          <button class="addbtn" id="online-link" type="button" hidden>Copia il link</button>
+          <button class="addbtn" id="online-refresh" type="button" hidden>Aggiorna ora</button>
+        </div>
+        <p class="status" id="online-status" role="status"></p>
+      </div>
+    </details>
     <details class="list import" id="importbox">
-      <summary>Importa le scelte ricevute</summary>
+      <summary>Importa le scelte ricevute per messaggio</summary>
       <div class="importin">
         <label for="paste">Incolla qui i messaggi dei compagni, anche tutti insieme
           <textarea id="paste" rows="4" placeholder="Incolla i messaggi con i codici GITA:…"></textarea>
@@ -265,6 +278,7 @@ details.import { margin-bottom: 18px; }
       </div>
     </details>
     <div class="stats" id="stats" aria-live="polite"></div>
+    <p class="hint" id="sync"></p>
     <div class="cols">
       <div class="main">
         <div class="mapcard">
@@ -286,10 +300,17 @@ details.import { margin-bottom: 18px; }
       </aside>
     </div>
   </section>
+  <p class="hint"><button class="del" id="iam-org" type="button" hidden>Sono io che organizzo la gita</button></p>
 </div>
 
 <script>
 (function () {
+  // Copia della pagina così com'è, prima che lo script la modifichi: serve a
+  // generare il file per i compagni con l'archivio online già collegato.
+  var PRISTINE = "<!doctype html>\n" + document.documentElement.outerHTML;
+  var ONLINE_ID = ""; // riempito nel file da distribuire ai compagni
+  var API = "https://jsonblob.com/api/jsonBlob";
+
   var MAP = /*__MAP__*/null;
 
   var COUNTRIES = {
@@ -323,7 +344,7 @@ details.import { margin-bottom: 18px; }
 
   var $ = function (id) { return document.getElementById(id); };
   var NS = "http://www.w3.org/2000/svg";
-  var uid = null, isAdmin = true, storeOk = true;
+  var uid = null, isAdmin = true, storeOk = true, onlineId = "";
   var STORE_KEY = "gita-scelte-v1";
   var subs = [];
   var sel = {};        // codice -> true, paesi scelti nel modulo
@@ -574,7 +595,7 @@ details.import { margin-bottom: 18px; }
     subs.slice().sort(function (a, b) { return (b.t || 0) - (a.t || 0); }).forEach(function (s) {
       var li = h("li", "prop");
       li.appendChild(h("div", "who", s.autore || "Anonimo"));
-      if ((uid && s.uid === uid) || isAdmin) {
+      if (isOrg() || s.id === memGet("gita-mio")) {
         var d = h("button", "del", "Elimina");
         d.type = "button";
         d.addEventListener("click", function () { armDelete(d, s.id); });
@@ -621,18 +642,25 @@ details.import { margin-bottom: 18px; }
     while (str.length % 4) str += "=";
     return decodeURIComponent(escape(atob(str)));
   }
-  function encodeDoc(d) {
+  function toCompact(d) {
     var o = { a: d.autore, p: d.paesi, t: d.t };
     if (d.citta) o.c = d.citta;
     if (d.altri) o.x = d.altri;
     if (d.motivo) o.m = d.motivo;
-    return "GITA:" + b64enc(JSON.stringify(o));
+    return o;
   }
-  // codice -> scelta valida oppure null (i codici arrivano da altri: si controlla tutto)
-  function decodeDoc(code) {
-    var o;
-    try { o = JSON.parse(b64dec(code)); } catch (e) { return null; }
-    if (!o || typeof o.a !== "string" || !o.a.trim() || !Array.isArray(o.p)) return null;
+  function encodeDoc(d) { return "GITA:" + b64enc(JSON.stringify(toCompact(d))); }
+  // chiave stabile per compagno: un solo posto per nome, sempre lettere minuscole, numeri e trattini
+  function keyOf(name) {
+    var k = norm(name).replace(/ /g, "-").slice(0, 60);
+    if (k) return k;
+    var n = 0;
+    for (var i = 0; i < name.length; i++) n = (n * 31 + name.charCodeAt(i)) >>> 0;
+    return "x" + n.toString(36);
+  }
+  // oggetto compatto -> scelta valida oppure null (arriva da altri: si controlla tutto)
+  function decodeObj(o) {
+    if (!o || typeof o !== "object" || typeof o.a !== "string" || !o.a.trim() || !Array.isArray(o.p)) return null;
     var d = { autore: o.a.trim().slice(0, 40), t: typeof o.t === "number" ? o.t : Date.now(), paesi: [] };
     o.p.forEach(function (c) { if (COUNTRIES[c] && d.paesi.indexOf(c) < 0) d.paesi.push(c); });
     if (o.c && typeof o.c === "object") {
@@ -650,8 +678,13 @@ details.import { margin-bottom: 18px; }
     }
     if (typeof o.m === "string" && o.m.trim()) d.motivo = o.m.trim().slice(0, 240);
     if (!d.paesi.length && !d.altri) return null;
-    d.id = norm(d.autore).replace(/ /g, "-") || "anonimo";
+    d.id = keyOf(d.autore);
     return d;
+  }
+  function decodeDoc(code) {
+    var o;
+    try { o = JSON.parse(b64dec(code)); } catch (e) { return null; }
+    return decodeObj(o);
   }
   function describe(d) {
     var parts = [];
@@ -674,6 +707,128 @@ details.import { margin-bottom: 18px; }
     return added;
   }
 
+  // ---------- archivio online ----------
+  // Un piccolo archivio JSON pubblico (jsonblob.com), senza account. Chi ha il file
+  // o il link legge e scrive; nessun altro sa dov'è. Ogni scrittura rilegge, unisce e controlla.
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function api(method, id, body, etag) {
+    var headers = { Accept: "application/json" };
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    if (etag) headers["If-Match"] = etag;
+    return fetch(API + (id ? "/" + id : ""), {
+      method: method, headers: headers, cache: "no-store",
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+  }
+  function entriesOf(data) {
+    var out = {};
+    var src = data && typeof data === "object" && data.scelte && typeof data.scelte === "object" ? data.scelte : {};
+    Object.keys(src).forEach(function (k) { if (/^[a-z0-9-]{1,60}$/.test(k)) out[k] = src[k]; });
+    return out;
+  }
+  async function readStore() {
+    var r = await api("GET", onlineId);
+    if (!r.ok) throw new Error("http " + r.status);
+    return { data: await r.json(), etag: r.headers.get("ETag") };
+  }
+  // mutate(scelte) -> nuove scelte; check(scelte) -> true se la modifica è presente dopo la scrittura
+  async function updateStore(mutate, check) {
+    var lastErr = null;
+    for (var i = 0; i < 6; i++) {
+      try {
+        var cur = await readStore();
+        var next = mutate(entriesOf(cur.data));
+        var r = await api("PUT", onlineId, { v: 1, scelte: next }, cur.etag);
+        if (r.status === 412 || r.status === 409) { await sleep(150 + Math.random() * 300 * (i + 1)); continue; }
+        if (!r.ok) throw new Error("http " + r.status);
+        var back = await readStore();
+        if (check(entriesOf(back.data))) return;
+        await sleep(150 + Math.random() * 300 * (i + 1));
+      } catch (e) { lastErr = e; await sleep(400 * (i + 1)); }
+    }
+    throw lastErr || new Error("conflitto");
+  }
+  async function createStore() {
+    var r = await api("POST", "", { v: 1, scelte: {} });
+    if (!r.ok) throw new Error("http " + r.status);
+    var id = r.headers.get("X-jsonblob-id") || (r.headers.get("Location") || "").split("/").pop();
+    if (!/^[A-Za-z0-9-]{8,80}$/.test(id || "")) throw new Error("id mancante");
+    return id;
+  }
+  function isOrg() { return !onlineId || memGet("gita-org") === onlineId; }
+  async function refresh() {
+    if (!onlineId) return;
+    try {
+      var cur = await readStore(), e = entriesOf(cur.data);
+      subs = Object.keys(e).map(function (k) { var d = decodeObj(e[k]); if (d) d.id = k; return d; }).filter(Boolean);
+      var t = new Date();
+      $("sync").textContent = "Raccolta online attiva. Aggiornato alle " + t.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) + ".";
+      renderResults();
+    } catch (err) {
+      $("sync").textContent = "Non riesco a leggere le scelte online. Riprovo tra poco.";
+    }
+  }
+  function setupOnlineUi() {
+    var org = isOrg();
+    $("iam-org").hidden = !(onlineId && !org);
+    $("onlinebox").hidden = !org;
+    $("importbox").hidden = !org;
+    $("online-on").hidden = !!onlineId;
+    $("online-dl").hidden = !onlineId;
+    $("online-refresh").hidden = !onlineId;
+    $("online-link").hidden = !(onlineId && /^https?:$/.test(location.protocol));
+    $("online-sum").textContent = onlineId ? "Raccolta online attiva" : "Raccolta online";
+    $("online-text").textContent = onlineId
+      ? "Manda ai compagni il file che scarichi qui sotto, oppure il link se questa pagina è su un sito. Le loro scelte arrivano da sole e compaiono qui entro pochi secondi."
+      : "Adesso le scelte arrivano solo se i compagni ti mandano il messaggio. Attiva la raccolta online: i compagni inviano direttamente dal file, senza fare altro.";
+    $("submit").textContent = onlineId ? "Invia la mia scelta" : "Prepara il mio messaggio";
+    $("lead").textContent = onlineId
+      ? "Scegli sulla mappa i paesi dove vorresti andare, oppure scrivili. Premi Invia e hai finito: la tua scelta arriva a chi organizza la gita."
+      : "Scegli sulla mappa i paesi dove vorresti andare, oppure scrivili. Poi copia il messaggio che ti do e mandalo a chi organizza la gita.";
+  }
+  $("online-on").addEventListener("click", async function () {
+    var b = $("online-on"), st = $("online-status");
+    b.disabled = true; st.className = "status"; st.textContent = "Creo l'archivio…";
+    try {
+      onlineId = await createStore();
+      memSet("gita-online-id", onlineId);
+      memSet("gita-org", onlineId);
+      subs = [];
+      setupOnlineUi();
+      st.textContent = "Fatto. Scarica il file e mandalo ai compagni.";
+      refresh();
+      startPolling();
+    } catch (e) {
+      st.className = "status err";
+      st.textContent = "Non riesco a creare l'archivio online (rete o servizio bloccati). Puoi continuare con i messaggi.";
+    }
+    b.disabled = false;
+  });
+  $("online-dl").addEventListener("click", function () {
+    var re = new RegExp('var ONLINE_' + 'ID = "[^"]*";');
+    var html = PRISTINE.replace(re, function () { return 'var ONLINE_' + 'ID = "' + onlineId + '";'; });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    a.download = "gita-classe.html";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    $("online-status").className = "status";
+    $("online-status").textContent = "File scaricato: gita-classe.html. Dallo ai compagni: si apre nel browser.";
+  });
+  $("online-link").addEventListener("click", function () {
+    var link = location.href.split("#")[0] + "#r=" + onlineId;
+    var st = $("online-status");
+    st.className = "status"; st.textContent = "Link: " + link;
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(function () { st.textContent = "Link copiato: " + link; }, function () {});
+  });
+  $("online-refresh").addEventListener("click", refresh);
+  $("iam-org").addEventListener("click", function () { memSet("gita-org", onlineId); setupOnlineUi(); renderResults(); });
+  var pollTimer = null;
+  function startPolling() {
+    if (pollTimer || !onlineId) return;
+    pollTimer = setInterval(function () { if (document.visibilityState === "visible") refresh(); }, 15000);
+  }
+
   // ---------- azioni ----------
   function armDelete(btn, id) {
     if (!btn.classList.contains("armed")) {
@@ -682,13 +837,27 @@ details.import { margin-bottom: 18px; }
       setTimeout(function () { if (btn.isConnected) { btn.classList.remove("armed"); btn.textContent = "Elimina"; } }, 3500);
       return;
     }
+    if (onlineId) {
+      btn.disabled = true;
+      updateStore(function (s) { delete s[id]; return s; }, function (ce) { return !(id in ce); })
+        .then(refresh, function () { btn.disabled = false; showNote("Non sono riuscito a eliminare la scelta. Riprova."); });
+      return;
+    }
     subs = subs.filter(function (s) { return s.id !== id; });
     saveSubs();
     renderResults();
   }
 
   var lastMessage = "";
-  $("form").addEventListener("submit", function (ev) {
+  function showMessage(doc) {
+    lastMessage = "Gita di classe, scelta di " + doc.autore + ": " + describe(doc) + "\nCodice: " + encodeDoc(doc);
+    $("code-out").value = lastMessage;
+    $("wa").href = "https://wa.me/?text=" + encodeURIComponent(lastMessage);
+    $("copystatus").textContent = "";
+    $("codebox").hidden = false;
+    $("codebox").scrollIntoView({ block: "nearest" });
+  }
+  $("form").addEventListener("submit", async function (ev) {
     ev.preventDefault();
     addTyped(); // se c'è testo non ancora aggiunto, lo conta
     var autore = $("f-autore").value.trim().replace(/\s+/g, " ");
@@ -703,13 +872,34 @@ details.import { margin-bottom: 18px; }
     var motivo = $("f-motivo").value.trim();
     if (motivo) doc.motivo = motivo.slice(0, 240);
     memSet("gita-autore", autore);
-    lastMessage = "Gita di classe, scelta di " + autore + ": " + describe(doc) + "\nCodice: " + encodeDoc(doc);
-    $("code-out").value = lastMessage;
-    $("wa").href = "https://wa.me/?text=" + encodeURIComponent(lastMessage);
-    $("copystatus").textContent = "";
-    $("codebox").hidden = false;
-    setStatus("Fatto. Ora copia il messaggio e mandalo.");
-    $("codebox").scrollIntoView({ block: "nearest" });
+    if (!onlineId) {
+      showMessage(doc);
+      setStatus("Fatto. Ora copia il messaggio e mandalo.");
+      return;
+    }
+    var id = keyOf(autore), compact = toCompact(doc);
+    $("submit").disabled = true;
+    setStatus("Invio…");
+    try {
+      await updateStore(function (s) {
+        var old = decodeObj(s[id]);
+        if (!old || old.t < doc.t) s[id] = compact;
+        return s;
+      }, function (ce) { return ce[id] && ce[id].t >= doc.t; });
+      memSet("gita-mio", id);
+      sel = {}; cityOf = {}; free = [];
+      $("f-motivo").value = "";
+      $("codebox").hidden = true;
+      setStatus("");
+      renderPick();
+      await refresh();
+      show("risultati");
+      showNote("Fatto! La tua scelta è stata inviata a chi organizza la gita.", true);
+    } catch (e) {
+      setStatus("Non sono riuscito a inviare. Controlla la connessione e riprova. Se non va, usa il messaggio qui sotto.", true);
+      showMessage(doc);
+    }
+    $("submit").disabled = false;
   });
   $("copy").addEventListener("click", function () {
     var out = $("code-out");
@@ -729,11 +919,19 @@ details.import { margin-bottom: 18px; }
     if (!found.length) { $("impstatus").textContent = "Non trovo nessun codice. Incolla i messaggi completi, con la riga \"Codice: GITA:…\"."; $("impstatus").className = "status err"; return; }
     var ok = [], bad = 0;
     found.forEach(function (f) { var d = decodeDoc(f.slice(5)); if (d) ok.push(d); else bad++; });
-    var added = mergeSubs(ok);
-    $("impstatus").className = "status" + (bad ? " err" : "");
-    $("impstatus").textContent = plural(added, "scelta importata", "scelte importate") + (bad ? ", " + plural(bad, "codice non valido", "codici non validi") + " (forse copiato a metà)" : "") + ".";
-    if (ok.length) $("paste").value = "";
-    renderResults();
+    function done(added) {
+      $("impstatus").className = "status" + (bad ? " err" : "");
+      $("impstatus").textContent = plural(added, "scelta importata", "scelte importate") + (bad ? ", " + plural(bad, "codice non valido", "codici non validi") + " (forse copiato a metà)" : "") + ".";
+      if (ok.length) $("paste").value = "";
+      renderResults();
+    }
+    if (!onlineId) { done(mergeSubs(ok)); return; }
+    updateStore(function (s) {
+      ok.forEach(function (d) { var old = decodeObj(s[d.id]); if (!old || old.t < d.t) s[d.id] = toCompact(d); });
+      return s;
+    }, function (ce) { return ok.every(function (d) { return ce[d.id]; }); })
+      .then(refresh).then(function () { done(ok.length); },
+        function () { $("impstatus").className = "status err"; $("impstatus").textContent = "Non sono riuscito a salvare online. Riprova."; });
   });
   var clearArmed = false;
   $("clear").addEventListener("click", function () {
@@ -744,8 +942,13 @@ details.import { margin-bottom: 18px; }
       return;
     }
     clearArmed = false; b.textContent = "Cancella tutto";
-    subs = []; saveSubs(); renderResults();
-    $("impstatus").className = "status"; $("impstatus").textContent = "Tutte le scelte importate sono state cancellate.";
+    function cleared() { $("impstatus").className = "status"; $("impstatus").textContent = "Tutte le scelte sono state cancellate."; }
+    if (onlineId) {
+      updateStore(function () { return {}; }, function (ce) { return !Object.keys(ce).length; }).then(refresh).then(cleared,
+        function () { $("impstatus").className = "status err"; $("impstatus").textContent = "Non sono riuscito a cancellare online. Riprova."; });
+      return;
+    }
+    subs = []; saveSubs(); renderResults(); cleared();
   });
   $("add").addEventListener("click", addTyped);
   $("f-testo").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addTyped(); } });
@@ -757,14 +960,9 @@ details.import { margin-bottom: 18px; }
     $("view-risultati").hidden = v !== "risultati";
     $("tab-scegli").setAttribute("aria-pressed", v === "scegli" ? "true" : "false");
     $("tab-risultati").setAttribute("aria-pressed", v === "risultati" ? "true" : "false");
-    try { if (location.hash !== "#" + v) location.hash = v; } catch (e) {}
   }
   $("tab-scegli").addEventListener("click", function () { hideNote(); show("scegli"); notesForAccess(); });
   $("tab-risultati").addEventListener("click", function () { hideNote(); show("risultati"); notesForAccess(); });
-  window.addEventListener("hashchange", function () {
-    var v = location.hash === "#risultati" ? "risultati" : location.hash === "#scegli" ? "scegli" : null;
-    if (v && v !== view) show(v);
-  });
 
   function notesForAccess() {}
 
@@ -794,11 +992,19 @@ details.import { margin-bottom: 18px; }
 
   $("f-autore").value = memGet("gita-autore") || "";
   renderPick();
-  if (location.hash === "#risultati") show("risultati");
 
-  subs = loadSubs();
-  renderResults();
-  $("importbox").open = !subs.length;
-  if (!storeOk) showNote("Il browser non permette di salvare: le scelte importate si perdono se chiudi la pagina.");
+  var fromLink = (location.hash.match(/^#r=([A-Za-z0-9-]{8,80})/) || [])[1];
+  onlineId = ONLINE_ID || fromLink || memGet("gita-online-id") || "";
+  setupOnlineUi();
+  $("onlinebox").open = !onlineId;
+  if (onlineId) {
+    refresh();
+    startPolling();
+  } else {
+    subs = loadSubs();
+    renderResults();
+    $("importbox").open = !subs.length;
+    if (!storeOk) showNote("Il browser non permette di salvare: le scelte importate si perdono se chiudi la pagina.");
+  }
 })();
 </script>

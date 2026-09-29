@@ -69,7 +69,7 @@ fs.writeFileSync('index.html', inject(fs.readFileSync('src/app.html', 'utf8')));
 
 // docs/index.html: pagina autonoma, senza account e senza server. Il frammento viene
 // diviso a <div class="wrap">: prima va nell'head (title, font, stili), dopo nel body.
-const offline = inject(fs.readFileSync('src/offline.html', 'utf8'));
+const offline = inject(fs.readFileSync('src/standalone.html', 'utf8'));
 const cut = offline.indexOf('<div class="wrap">');
 fs.mkdirSync('docs', { recursive: true });
 fs.writeFileSync('docs/index.html',
