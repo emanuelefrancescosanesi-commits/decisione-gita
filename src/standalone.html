@@ -278,7 +278,7 @@ details.import { margin-bottom: 18px; }
       </div>
     </details>
     <div class="stats" id="stats" aria-live="polite"></div>
-    <p class="hint" id="sync"></p>
+    <p class="hint"><span id="sync"></span> <button class="del" id="sync-refresh" type="button" hidden>Aggiorna</button></p>
     <div class="cols">
       <div class="main">
         <div class="mapcard">
@@ -309,7 +309,7 @@ details.import { margin-bottom: 18px; }
   // generare il file per i compagni con l'archivio online già collegato.
   var PRISTINE = "<!doctype html>\n" + document.documentElement.outerHTML;
   var ONLINE_ID = ""; // riempito nel file da distribuire ai compagni
-  var API = "https://jsonblob.com/api/jsonBlob";
+  var NTFY = "https://ntfy.sh/";
 
   var MAP = /*__MAP__*/null;
 
@@ -708,65 +708,92 @@ details.import { margin-bottom: 18px; }
   }
 
   // ---------- archivio online ----------
-  // Un piccolo archivio JSON pubblico (jsonblob.com), senza account. Chi ha il file
-  // o il link legge e scrive; nessun altro sa dov'è. Ogni scrittura rilegge, unisce e controlla.
+  // Usa ntfy.sh, un servizio pubblico di messaggi senza account. Ogni scelta è un
+  // messaggio in un "argomento" con nome casuale: chi ha il file sa il nome, gli altri no.
+  // I messaggi non si sovrascrivono mai, quindi più compagni possono inviare insieme.
+  // Il servizio li conserva 12 ore: ogni lettura ne salva una copia sul dispositivo.
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function api(method, id, body, etag) {
-    var headers = { Accept: "application/json" };
-    if (body !== undefined) headers["Content-Type"] = "application/json";
-    if (etag) headers["If-Match"] = etag;
-    return fetch(API + (id ? "/" + id : ""), {
-      method: method, headers: headers, cache: "no-store",
-      body: body === undefined ? undefined : JSON.stringify(body)
-    });
+  async function publish(obj) {
+    var err = null;
+    for (var i = 0; i < 4; i++) {
+      try {
+        var r = await fetch(NTFY + onlineId, { method: "POST", body: JSON.stringify(obj) });
+        if (r.ok) return;
+        err = new Error(r.status === 429 ? "troppe richieste" : "errore " + r.status);
+        if (r.status === 429) { await sleep(2500 * (i + 1)); continue; }
+      } catch (e) { err = new Error("servizio non raggiungibile"); }
+      await sleep(500 * (i + 1));
+    }
+    throw err || new Error("rete");
   }
-  function entriesOf(data) {
-    var out = {};
-    var src = data && typeof data === "object" && data.scelte && typeof data.scelte === "object" ? data.scelte : {};
-    Object.keys(src).forEach(function (k) { if (/^[a-z0-9-]{1,60}$/.test(k)) out[k] = src[k]; });
+  async function readLog() {
+    var r = await fetch(NTFY + onlineId + "/json?poll=1&since=all", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status === 429 ? "troppe richieste" : "errore " + r.status);
+    var out = [];
+    (await r.text()).split("\n").forEach(function (line) {
+      if (!line) return;
+      try {
+        var m = JSON.parse(line);
+        if (m.event === "message" && typeof m.message === "string") out.push({ id: m.id, time: m.time, msg: m.message });
+      } catch (e) {}
+    });
     return out;
   }
-  async function readStore() {
-    var r = await api("GET", onlineId);
-    if (!r.ok) throw new Error("http " + r.status);
-    return { data: await r.json(), etag: r.headers.get("ETag") };
+  function logKey() { return "gita-log-" + onlineId; }
+  function loadLog() {
+    try { var a = JSON.parse(localStorage.getItem(logKey()) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
   }
-  // mutate(scelte) -> nuove scelte; check(scelte) -> true se la modifica è presente dopo la scrittura
-  async function updateStore(mutate, check) {
-    var lastErr = null;
-    for (var i = 0; i < 6; i++) {
-      try {
-        var cur = await readStore();
-        var next = mutate(entriesOf(cur.data));
-        var r = await api("PUT", onlineId, { v: 1, scelte: next }, cur.etag);
-        if (r.status === 412 || r.status === 409) { await sleep(150 + Math.random() * 300 * (i + 1)); continue; }
-        if (!r.ok) throw new Error("http " + r.status);
-        var back = await readStore();
-        if (check(entriesOf(back.data))) return;
-        await sleep(150 + Math.random() * 300 * (i + 1));
-      } catch (e) { lastErr = e; await sleep(400 * (i + 1)); }
-    }
-    throw lastErr || new Error("conflitto");
+  function mergeLog(a, b) {
+    var seen = {}, out = [];
+    a.concat(b).forEach(function (m) {
+      if (!m || typeof m.id !== "string" || typeof m.time !== "number" || typeof m.msg !== "string" || seen[m.id]) return;
+      seen[m.id] = true; out.push(m);
+    });
+    out.sort(function (x, y) { return x.time - y.time; });
+    return out.slice(-1500);
+  }
+  function saveLog(log) { try { localStorage.setItem(logKey(), JSON.stringify(log)); } catch (e) {} }
+  // pubblica e tiene subito una copia locale, così si vede anche se la lettura successiva fallisce
+  async function send(obj) {
+    await publish(obj);
+    var text = JSON.stringify(obj);
+    saveLog(mergeLog(loadLog(), [{ id: "loc-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7), time: Math.floor(Date.now() / 1000), msg: text }]));
+  }
+  // messaggi -> scelte attuali. Vale l'ultimo messaggio per ogni compagno; cancellazioni e "cancella tutto" tolgono le scelte precedenti.
+  function reduceLog(log) {
+    var ent = {}, tomb = {}, clearT = 0;
+    log.forEach(function (m) {
+      var o, t = m.time;
+      try { o = JSON.parse(m.msg); } catch (e) { return; }
+      if (!o || typeof o !== "object") return;
+      if (o.z) { if (t > clearT) clearT = t; return; }
+      if (typeof o.k !== "string" || !/^[a-z0-9-]{1,60}$/.test(o.k)) return;
+      if (o.d) { if (t > (tomb[o.k] || 0)) tomb[o.k] = t; return; }
+      if (o.o && (!ent[o.k] || t >= ent[o.k].t)) ent[o.k] = { o: o.o, t: t };
+    });
+    return Object.keys(ent).filter(function (k) { return ent[k].t > clearT && ent[k].t > (tomb[k] || 0); })
+      .map(function (k) { var d = decodeObj(ent[k].o); if (d) d.id = k; return d; }).filter(Boolean);
   }
   async function createStore() {
-    var r = await api("POST", "", { v: 1, scelte: {} });
-    if (!r.ok) throw new Error("http " + r.status);
-    var id = r.headers.get("X-jsonblob-id") || (r.headers.get("Location") || "").split("/").pop();
-    if (!/^[A-Za-z0-9-]{8,80}$/.test(id || "")) throw new Error("id mancante");
+    var a = new Uint8Array(16);
+    crypto.getRandomValues(a);
+    var id = "gita" + Array.prototype.map.call(a, function (b) { return (b % 36).toString(36); }).join("");
+    var before = onlineId;
+    onlineId = id;
+    try { await publish({ init: 1 }); } catch (e) { onlineId = before; throw e; }
     return id;
   }
   function isOrg() { return !onlineId || memGet("gita-org") === onlineId; }
   async function refresh() {
     if (!onlineId) return;
-    try {
-      var cur = await readStore(), e = entriesOf(cur.data);
-      subs = Object.keys(e).map(function (k) { var d = decodeObj(e[k]); if (d) d.id = k; return d; }).filter(Boolean);
-      var t = new Date();
-      $("sync").textContent = "Raccolta online attiva. Aggiornato alle " + t.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) + ".";
-      renderResults();
-    } catch (err) {
-      $("sync").textContent = "Non riesco a leggere le scelte online. Riprovo tra poco.";
-    }
+    var log = loadLog(), live = true, why = "";
+    try { log = mergeLog(log, await readLog()); saveLog(log); } catch (e) { live = false; why = e.message; }
+    subs = reduceLog(log);
+    var t = new Date();
+    $("sync").textContent = live
+      ? "Raccolta online attiva. Aggiornato alle " + t.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) + "."
+      : "Non riesco a leggere le scelte online (" + why + "): mostro quelle già salvate. Riprova tra poco.";
+    renderResults();
   }
   function setupOnlineUi() {
     var org = isOrg();
@@ -776,10 +803,11 @@ details.import { margin-bottom: 18px; }
     $("online-on").hidden = !!onlineId;
     $("online-dl").hidden = !onlineId;
     $("online-refresh").hidden = !onlineId;
+    $("sync-refresh").hidden = !onlineId;
     $("online-link").hidden = !(onlineId && /^https?:$/.test(location.protocol));
     $("online-sum").textContent = onlineId ? "Raccolta online attiva" : "Raccolta online";
     $("online-text").textContent = onlineId
-      ? "Manda ai compagni il file che scarichi qui sotto, oppure il link se questa pagina è su un sito. Le loro scelte arrivano da sole e compaiono qui entro pochi secondi."
+      ? "Manda ai compagni il file che scarichi qui sotto, oppure il link se questa pagina è su un sito. Le loro scelte arrivano da sole. Il servizio le tiene 12 ore: questa pagina ne salva una copia su questo dispositivo ogni volta che si aggiorna, quindi aprila almeno una volta ogni 12 ore e usa sempre lo stesso dispositivo."
       : "Adesso le scelte arrivano solo se i compagni ti mandano il messaggio. Attiva la raccolta online: i compagni inviano direttamente dal file, senza fare altro.";
     $("submit").textContent = onlineId ? "Invia la mia scelta" : "Prepara il mio messaggio";
     $("lead").textContent = onlineId
@@ -790,7 +818,7 @@ details.import { margin-bottom: 18px; }
     var b = $("online-on"), st = $("online-status");
     b.disabled = true; st.className = "status"; st.textContent = "Creo l'archivio…";
     try {
-      onlineId = await createStore();
+      await createStore();
       memSet("gita-online-id", onlineId);
       memSet("gita-org", onlineId);
       subs = [];
@@ -800,7 +828,7 @@ details.import { margin-bottom: 18px; }
       startPolling();
     } catch (e) {
       st.className = "status err";
-      st.textContent = "Non riesco a creare l'archivio online (rete o servizio bloccati). Puoi continuare con i messaggi.";
+      st.textContent = "Non riesco a raggiungere il servizio online (" + e.message + "). La rete potrebbe bloccarlo: prova con un'altra connessione, oppure continua con i messaggi.";
     }
     b.disabled = false;
   });
@@ -822,10 +850,11 @@ details.import { margin-bottom: 18px; }
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(function () { st.textContent = "Link copiato: " + link; }, function () {});
   });
   $("online-refresh").addEventListener("click", refresh);
+  $("sync-refresh").addEventListener("click", refresh);
   $("iam-org").addEventListener("click", function () { memSet("gita-org", onlineId); setupOnlineUi(); renderResults(); });
   var pollTimer = null;
   function startPolling() {
-    if (pollTimer || !onlineId) return;
+    if (pollTimer || !onlineId || !isOrg()) return; // gli altri aggiornano a mano, per non pesare sul servizio
     pollTimer = setInterval(function () { if (document.visibilityState === "visible") refresh(); }, 15000);
   }
 
@@ -839,8 +868,7 @@ details.import { margin-bottom: 18px; }
     }
     if (onlineId) {
       btn.disabled = true;
-      updateStore(function (s) { delete s[id]; return s; }, function (ce) { return !(id in ce); })
-        .then(refresh, function () { btn.disabled = false; showNote("Non sono riuscito a eliminare la scelta. Riprova."); });
+      send({ k: id, d: 1 }).then(refresh, function () { btn.disabled = false; showNote("Non sono riuscito a eliminare la scelta. Riprova."); });
       return;
     }
     subs = subs.filter(function (s) { return s.id !== id; });
@@ -881,11 +909,7 @@ details.import { margin-bottom: 18px; }
     $("submit").disabled = true;
     setStatus("Invio…");
     try {
-      await updateStore(function (s) {
-        var old = decodeObj(s[id]);
-        if (!old || old.t < doc.t) s[id] = compact;
-        return s;
-      }, function (ce) { return ce[id] && ce[id].t >= doc.t; });
+      await send({ k: id, o: compact });
       memSet("gita-mio", id);
       sel = {}; cityOf = {}; free = [];
       $("f-motivo").value = "";
@@ -926,10 +950,7 @@ details.import { margin-bottom: 18px; }
       renderResults();
     }
     if (!onlineId) { done(mergeSubs(ok)); return; }
-    updateStore(function (s) {
-      ok.forEach(function (d) { var old = decodeObj(s[d.id]); if (!old || old.t < d.t) s[d.id] = toCompact(d); });
-      return s;
-    }, function (ce) { return ok.every(function (d) { return ce[d.id]; }); })
+    ok.reduce(function (p, d) { return p.then(function () { return send({ k: d.id, o: toCompact(d) }); }); }, Promise.resolve())
       .then(refresh).then(function () { done(ok.length); },
         function () { $("impstatus").className = "status err"; $("impstatus").textContent = "Non sono riuscito a salvare online. Riprova."; });
   });
@@ -944,7 +965,7 @@ details.import { margin-bottom: 18px; }
     clearArmed = false; b.textContent = "Cancella tutto";
     function cleared() { $("impstatus").className = "status"; $("impstatus").textContent = "Tutte le scelte sono state cancellate."; }
     if (onlineId) {
-      updateStore(function () { return {}; }, function (ce) { return !Object.keys(ce).length; }).then(refresh).then(cleared,
+      send({ z: 1 }).then(refresh).then(cleared,
         function () { $("impstatus").className = "status err"; $("impstatus").textContent = "Non sono riuscito a cancellare online. Riprova."; });
       return;
     }
@@ -962,7 +983,7 @@ details.import { margin-bottom: 18px; }
     $("tab-risultati").setAttribute("aria-pressed", v === "risultati" ? "true" : "false");
   }
   $("tab-scegli").addEventListener("click", function () { hideNote(); show("scegli"); notesForAccess(); });
-  $("tab-risultati").addEventListener("click", function () { hideNote(); show("risultati"); notesForAccess(); });
+  $("tab-risultati").addEventListener("click", function () { hideNote(); show("risultati"); notesForAccess(); refresh(); });
 
   function notesForAccess() {}
 
@@ -993,7 +1014,7 @@ details.import { margin-bottom: 18px; }
   $("f-autore").value = memGet("gita-autore") || "";
   renderPick();
 
-  var fromLink = (location.hash.match(/^#r=([A-Za-z0-9-]{8,80})/) || [])[1];
+  var fromLink = (location.hash.match(/^#r=([A-Za-z0-9]{16,40})/) || [])[1];
   onlineId = ONLINE_ID || fromLink || memGet("gita-online-id") || "";
   setupOnlineUi();
   $("onlinebox").open = !onlineId;
