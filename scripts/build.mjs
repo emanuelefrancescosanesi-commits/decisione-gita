@@ -59,7 +59,22 @@ const countries = eu.map(({ code, polys }) => {
 });
 const map = { w: W, h: H, countries, context: context.map((c) => path(c)).filter(Boolean).join('') };
 
-const html = fs.readFileSync('src/app.html', 'utf8');
-if (!html.includes('/*__MAP__*/null')) throw new Error('segnaposto mappa mancante in src/app.html');
-fs.writeFileSync('index.html', html.replace('/*__MAP__*/null', JSON.stringify(map)));
-console.log('index.html scritto,', Math.round(fs.statSync('index.html').size / 1024), 'KB');
+const inject = (html) => {
+  if (!html.includes('/*__MAP__*/null')) throw new Error('segnaposto mappa mancante');
+  return html.replace('/*__MAP__*/null', JSON.stringify(map));
+};
+
+// index.html: frammento per l'Artifact di claude.ai (salvataggio condiviso, serve un account)
+fs.writeFileSync('index.html', inject(fs.readFileSync('src/app.html', 'utf8')));
+
+// docs/index.html: pagina autonoma, senza account e senza server. Il frammento viene
+// diviso a <div class="wrap">: prima va nell'head (title, font, stili), dopo nel body.
+const offline = inject(fs.readFileSync('src/offline.html', 'utf8'));
+const cut = offline.indexOf('<div class="wrap">');
+fs.mkdirSync('docs', { recursive: true });
+fs.writeFileSync('docs/index.html',
+  '<!doctype html>\n<html lang="it">\n<head>\n<meta charset="utf-8">\n' +
+  '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n' +
+  '<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>\n' +
+  offline.slice(0, cut) + '</head>\n<body>\n' + offline.slice(cut) + '</body>\n</html>\n');
+for (const f of ['index.html', 'docs/index.html']) console.log(f, Math.round(fs.statSync(f).size / 1024), 'KB');

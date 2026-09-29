@@ -1,0 +1,804 @@
+<title>Meta della gita</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: due schede (Scegli / Risultati). Mappa UE a sinistra, modulo o elenco a destra; classifica su cartello autostradale verde. */
+:root {
+  --bg: #eef2ee;
+  --surface: #ffffff;
+  --ink: #14231b;
+  --muted: #55665c;
+  --line: #cfd9d1;
+  --sign: #0d5c3a;
+  --sign-track: #0a4a2f;
+  --sign-ink: #f4f8f4;
+  --sign-dim: #a9cdb8;
+  --accent: #f2c230;
+  --accent-ink: #2a2100;
+  --danger: #b3261e;
+  --focus: #1a6fdb;
+  --sea: #dbe6e0;
+  --ctx: #c5d1c9;
+  --eu: #fbfdfb;
+  --edge: #8fa397;
+  --font-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1612;
+    --surface: #16211b;
+    --ink: #e8efe9;
+    --muted: #9db0a4;
+    --line: #2a3a31;
+    --sign: #0f6b43;
+    --sign-track: #0b4f31;
+    --danger: #ff8a80;
+    --focus: #6ea8ff;
+    --sea: #0a110d;
+    --ctx: #1a2820;
+    --eu: #2d4036;
+    --edge: #0e1612;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1612;
+  --surface: #16211b;
+  --ink: #e8efe9;
+  --muted: #9db0a4;
+  --line: #2a3a31;
+  --sign: #0f6b43;
+  --sign-track: #0b4f31;
+  --danger: #ff8a80;
+  --focus: #6ea8ff;
+  --sea: #0a110d;
+  --ctx: #1a2820;
+  --eu: #2d4036;
+  --edge: #0e1612;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+}
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.wrap { max-width: 1060px; margin-inline: auto; display: grid; gap: 22px; }
+header { display: grid; gap: 6px; }
+.eyebrow { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .12em; font-size: 14px; color: var(--muted); }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(38px, 8vw, 64px); line-height: .98; margin: 0; text-wrap: balance; }
+.lead { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+
+.tabs { display: inline-flex; border: 2px solid var(--sign); border-radius: 999px; padding: 3px; gap: 3px; justify-self: start; }
+.tab { border: 0; background: transparent; border-radius: 999px; padding: 8px 20px; min-height: 42px; cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink); }
+.tab[aria-pressed="true"] { background: var(--sign); color: var(--sign-ink); }
+
+.note { margin: 0; padding: 12px 16px; border-left: 4px solid var(--accent); background: var(--surface); font-size: 14px; }
+.note.ok { border-left-color: var(--sign); }
+
+.cols { display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr) 340px; } .sticky { position: sticky; top: 16px; } }
+.main { display: grid; gap: 22px; min-width: 0; }
+.side { min-width: 0; }
+
+/* Mappa */
+.mapcard { display: grid; gap: 8px; }
+.mapbox { border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: var(--sea); }
+.mapbox svg { display: block; width: 100%; height: auto; }
+.mapbox .sea { fill: var(--sea); }
+.mapbox .ctx { fill: var(--ctx); stroke: var(--sea); stroke-width: .6; }
+.mapbox .eu path, .mapbox .eu .ring { fill: var(--fill, var(--eu)); stroke: var(--edge); stroke-width: .8; cursor: pointer; }
+.mapbox .eu .ring { stroke-dasharray: 3 2; stroke-width: 1.2; pointer-events: all; }
+.mapbox .eu.on { --fill: var(--sign); }
+.mapbox .eu:hover path, .mapbox .eu:hover .ring { filter: brightness(.9); }
+.mapbox .eu:focus { outline: none; }
+.mapbox .eu:focus-visible path, .mapbox .eu:focus-visible .ring { stroke: var(--focus); stroke-width: 3; }
+.mapbox .eu.sel path, .mapbox .eu.sel .ring { stroke: var(--accent); stroke-width: 3; }
+.lbl { font-family: var(--font-display); font-weight: 700; font-size: 16px; text-anchor: middle; dominant-baseline: central; pointer-events: none; fill: var(--ink); }
+.lbl.light { fill: #fff; }
+.hint { margin: 0; font-size: 14px; color: var(--muted); }
+.legend { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.legend i { flex: 0 1 180px; height: 10px; border-radius: 5px; border: 1px solid var(--line); background: linear-gradient(to right, var(--eu), var(--sign)); }
+
+details.list { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+details.list > summary { cursor: pointer; padding: 12px 16px; min-height: 46px; font-weight: 600; }
+.chipgrid { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 16px 16px; }
+.tog { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 6px 14px; min-height: 38px; cursor: pointer; font-size: 14px; }
+.tog[aria-pressed="true"] { background: var(--sign); border-color: var(--sign); color: var(--sign-ink); }
+
+/* Modulo */
+.formcard { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.formcard h2 { font-family: var(--font-display); font-weight: 700; font-size: 26px; margin: 0; padding: 14px 16px 0; }
+form { display: grid; gap: 14px; padding: 12px 16px 18px; }
+label { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
+label .opt { font-weight: 400; color: var(--muted); }
+input, textarea { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-weight: 400; font-size: 16px; }
+textarea { resize: vertical; min-height: 70px; }
+.addrow { display: flex; gap: 8px; }
+.addrow input { flex: 1; }
+.addbtn { border: 2px solid var(--sign); background: transparent; color: var(--sign); border-radius: 6px; padding: 0 14px; min-height: 44px; font-weight: 600; cursor: pointer; }
+:root[data-theme="dark"] .addbtn { color: var(--sign-dim); border-color: var(--sign-dim); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .addbtn { color: var(--sign-dim); border-color: var(--sign-dim); } }
+.picked-title { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+.picked { display: flex; flex-wrap: wrap; gap: 6px; min-height: 34px; }
+.picked .none { color: var(--muted); font-size: 14px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; background: var(--sign); color: var(--sign-ink); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 14px; }
+.pill.free { background: transparent; color: var(--ink); border: 1px solid var(--muted); }
+.pill button { border: 0; background: rgba(255,255,255,.2); color: inherit; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; line-height: 1; font-size: 16px; }
+.pill.free button { background: var(--line); }
+.submit { border: 0; border-radius: 6px; background: var(--sign); color: var(--sign-ink); cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: .04em; text-transform: uppercase; padding: 10px 16px; min-height: 48px; }
+.submit:hover:not(:disabled) { filter: brightness(1.12); }
+.submit:disabled { opacity: .55; cursor: default; }
+.status { min-height: 1.4em; font-size: 14px; margin: 0; color: var(--muted); }
+.status.err { color: var(--danger); }
+
+/* Risultati */
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; font-variant-numeric: tabular-nums; margin-bottom: 18px; }
+.stats span { color: var(--muted); font-size: 14px; }
+.stats b { font-family: var(--font-display); font-size: 24px; color: var(--ink); margin-right: 4px; }
+.detail { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-height: 76px; }
+.detail b { font-family: var(--font-display); font-size: 26px; display: block; line-height: 1.1; }
+.detail p { margin: 4px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+
+.board { background: var(--sign); color: var(--sign-ink); border-radius: 6px; padding: 18px 16px 8px; box-shadow: inset 0 0 0 3px var(--sign), inset 0 0 0 5px var(--sign-ink); }
+.board-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 6px 10px 12px; flex-wrap: wrap; }
+.board-head h2 { font-family: var(--font-display); font-size: 26px; text-transform: uppercase; letter-spacing: .06em; margin: 0; }
+.board-head span { font-size: 13px; color: var(--sign-dim); }
+.rows { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 10px; border-top: 1px solid rgba(244,248,244,.22); }
+.rank { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.row .name { font-family: var(--font-display); font-weight: 700; font-size: 26px; line-height: 1.05; overflow-wrap: anywhere; }
+.row .meta { grid-column: 2 / 4; font-size: 13.5px; color: var(--sign-dim); overflow-wrap: anywhere; }
+.tag-lead { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 1px 7px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; background: var(--accent); color: var(--accent-ink); border-radius: 3px; }
+.bar { grid-column: 2 / 4; height: 8px; background: var(--sign-track); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; min-width: 6px; }
+.count { grid-column: 3; grid-row: 1; font-family: var(--font-display); font-weight: 700; font-size: 32px; line-height: 1; font-variant-numeric: tabular-nums; }
+.count small { font-size: 13px; font-weight: 600; color: var(--sign-dim); margin-left: 4px; letter-spacing: .04em; }
+.empty { padding: 26px 10px 30px; border-top: 1px solid rgba(244,248,244,.22); }
+.empty b { font-family: var(--font-display); font-size: 24px; display: block; }
+.empty p { margin: 4px 0 0; color: var(--sign-dim); max-width: 44ch; }
+
+h2.sec { font-family: var(--font-display); font-size: 26px; letter-spacing: .02em; margin: 0 0 10px; }
+.props { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.prop { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+.prop .who { font-weight: 600; font-size: 17px; overflow-wrap: anywhere; }
+.prop .dest { grid-column: 1 / -1; color: var(--ink); overflow-wrap: anywhere; }
+.prop .why { grid-column: 1 / -1; margin: 2px 0 0; color: var(--muted); font-size: 14.5px; overflow-wrap: anywhere; }
+.del { align-self: start; border: 1px solid var(--line); background: transparent; border-radius: 6px; padding: 4px 10px; min-height: 36px; cursor: pointer; color: var(--muted); font-size: 14px; }
+.del:hover { border-color: var(--danger); color: var(--danger); }
+.del.armed { border-color: var(--danger); background: var(--danger); color: var(--surface); }
+.none { color: var(--muted); padding: 14px 2px; margin: 0; }
+.codebox { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+.codebox textarea { font-size: 14px; min-height: 96px; }
+.codebtns { display: flex; flex-wrap: wrap; gap: 8px; }
+.codebtns .submit { flex: 1 1 140px; }
+a.addbtn { display: inline-flex; align-items: center; text-decoration: none; }
+details.import { margin-bottom: 18px; }
+.importin { display: grid; gap: 12px; padding: 4px 16px 16px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Gita di classe</div>
+    <h1>Dove andiamo in gita?</h1>
+    <p class="lead">Scegli sulla mappa i paesi dove vorresti andare, oppure scrivili. Poi copia il messaggio che ti do e mandalo a chi organizza la gita.</p>
+    <nav class="tabs" aria-label="Sezioni">
+      <button class="tab" id="tab-scegli" type="button" aria-pressed="true">Scegli</button>
+      <button class="tab" id="tab-risultati" type="button" aria-pressed="false">Risultati</button>
+    </nav>
+  </header>
+
+  <p class="note" id="note" role="status" hidden></p>
+
+  <section id="view-scegli" aria-label="Scegli la meta">
+    <div class="cols">
+      <div class="main">
+        <div class="mapcard">
+          <div class="mapbox" id="map-pick"></div>
+          <p class="hint">Tocca un paese per sceglierlo, toccalo di nuovo per toglierlo. Puoi sceglierne più di uno.</p>
+        </div>
+        <details class="list">
+          <summary>Preferisci l'elenco? Scegli tra i 27 paesi UE</summary>
+          <div class="chipgrid" id="chips-all"></div>
+        </details>
+      </div>
+      <aside class="side sticky">
+        <div class="formcard">
+          <h2>La tua scelta</h2>
+          <form id="form" autocomplete="off">
+            <label for="f-autore">Il tuo nome
+              <input id="f-autore" name="autore" maxlength="40" required>
+            </label>
+            <label for="f-testo">Scrivi un paese o una città <span class="opt">(anche fuori UE)</span>
+              <div class="addrow">
+                <input id="f-testo" list="dl-mete" maxlength="40" placeholder="Es. Spagna, Praga, Regno Unito">
+                <button class="addbtn" id="add" type="button">Aggiungi</button>
+              </div>
+            </label>
+            <datalist id="dl-mete"></datalist>
+            <div>
+              <p class="picked-title">Le tue mete</p>
+              <div class="picked" id="picked"></div>
+            </div>
+            <label for="f-motivo">Perché? <span class="opt">(facoltativo)</span>
+              <textarea id="f-motivo" name="motivo" maxlength="240"></textarea>
+            </label>
+            <button class="submit" id="submit" type="submit">Prepara il mio messaggio</button>
+            <p class="status" id="status" role="status"></p>
+            <div class="codebox" id="codebox" hidden>
+              <p class="picked-title">Manda questo messaggio a chi organizza la gita</p>
+              <textarea id="code-out" readonly rows="4" aria-label="Messaggio da inviare"></textarea>
+              <div class="codebtns">
+                <button class="addbtn" id="copy" type="button">Copia</button>
+                <a class="addbtn" id="wa" target="_blank" rel="noopener">WhatsApp</a>
+              </div>
+              <p class="status" id="copystatus" role="status"></p>
+            </div>
+          </form>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="view-risultati" aria-label="Risultati" hidden>
+    <details class="list import" id="importbox">
+      <summary>Importa le scelte ricevute</summary>
+      <div class="importin">
+        <label for="paste">Incolla qui i messaggi dei compagni, anche tutti insieme
+          <textarea id="paste" rows="4" placeholder="Incolla i messaggi con i codici GITA:…"></textarea>
+        </label>
+        <div class="codebtns">
+          <button class="submit" id="import" type="button">Importa</button>
+          <button class="addbtn" id="clear" type="button">Cancella tutto</button>
+        </div>
+        <p class="status" id="impstatus" role="status"></p>
+      </div>
+    </details>
+    <div class="stats" id="stats" aria-live="polite"></div>
+    <div class="cols">
+      <div class="main">
+        <div class="mapcard">
+          <div class="mapbox" id="map-res"></div>
+          <div class="legend"><span>Nessuno</span><i></i><span id="legend-max">Più scelto</span></div>
+        </div>
+        <div class="detail" id="detail" aria-live="polite"></div>
+        <section class="board" aria-labelledby="board-title">
+          <div class="board-head">
+            <h2 id="board-title">Classifica mete</h2>
+            <span>1 punto per ogni compagno che la sceglie</span>
+          </div>
+          <ol class="rows" id="rows"></ol>
+        </section>
+      </div>
+      <aside class="side">
+        <h2 class="sec">Chi ha scelto cosa</h2>
+        <ul class="props" id="props"></ul>
+      </aside>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var MAP = /*__MAP__*/null;
+
+  var COUNTRIES = {
+    AT: "Austria", BE: "Belgio", BG: "Bulgaria", HR: "Croazia", CY: "Cipro", CZ: "Cechia",
+    DK: "Danimarca", EE: "Estonia", FI: "Finlandia", FR: "Francia", DE: "Germania", GR: "Grecia",
+    HU: "Ungheria", IE: "Irlanda", IT: "Italia", LV: "Lettonia", LT: "Lituania", LU: "Lussemburgo",
+    MT: "Malta", NL: "Paesi Bassi", PL: "Polonia", PT: "Portogallo", RO: "Romania", SK: "Slovacchia",
+    SI: "Slovenia", ES: "Spagna", SE: "Svezia"
+  };
+  // Altri modi di scrivere un paese (nome inglese o d'uso comune)
+  var ALIASES = {
+    NL: ["olanda", "holland", "netherlands"], CZ: ["repubblica ceca", "rep ceca", "czechia", "czech republic"],
+    ES: ["spain"], DE: ["germany"], FR: ["france"], IT: ["italy"], GR: ["greece"], AT: ["austria"], PT: ["portugal"],
+    HU: ["hungary"], IE: ["ireland"], PL: ["poland"], SE: ["sweden"], DK: ["denmark"], FI: ["finland"],
+    HR: ["croatia"], BE: ["belgium"], CY: ["cyprus"], LT: ["lithuania"], LV: ["latvia"], EE: ["estonia"],
+    RO: ["romania"], BG: ["bulgaria"], SK: ["slovakia"], SI: ["slovenia"], LU: ["luxembourg"]
+  };
+  // Città e luoghi da gita -> paese
+  var CITIES = {
+    ES: ["Barcellona", "Madrid", "Siviglia", "Valencia", "Ibiza", "Maiorca", "Tenerife"],
+    FR: ["Parigi", "Nizza", "Lione", "Disneyland Parigi", "Marsiglia"],
+    DE: ["Berlino", "Monaco di Baviera", "Amburgo", "Colonia", "Francoforte"],
+    CZ: ["Praga"], AT: ["Vienna", "Salisburgo", "Innsbruck"], HU: ["Budapest"], NL: ["Amsterdam"],
+    BE: ["Bruxelles", "Bruges"], PT: ["Lisbona", "Porto"],
+    GR: ["Atene", "Santorini", "Mykonos", "Creta", "Rodi", "Corfù"],
+    IE: ["Dublino"], PL: ["Varsavia", "Cracovia"], DK: ["Copenaghen"], SE: ["Stoccolma"], FI: ["Helsinki"],
+    EE: ["Tallinn"], LV: ["Riga"], LT: ["Vilnius"], RO: ["Bucarest"], BG: ["Sofia"],
+    HR: ["Zagabria", "Dubrovnik", "Spalato"], SI: ["Lubiana"], SK: ["Bratislava"], MT: ["La Valletta"],
+    CY: ["Nicosia"], IT: ["Roma", "Napoli", "Firenze", "Venezia", "Milano", "Torino", "Sicilia", "Sardegna"]
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var NS = "http://www.w3.org/2000/svg";
+  var uid = null, isAdmin = true, storeOk = true;
+  var STORE_KEY = "gita-scelte-v1";
+  var subs = [];
+  var sel = {};        // codice -> true, paesi scelti nel modulo
+  var cityOf = {};     // codice -> [città] scritte nel modulo
+  var free = [];       // mete fuori mappa scritte nel modulo
+  var openCode = null; // paese aperto nel dettaglio dei risultati
+  var view = "scegli";
+
+  function h(tag, cls, text) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+  function svg(tag, attrs) {
+    var el = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+    return el;
+  }
+  function norm(s) {
+    return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+  function pretty(s) {
+    s = String(s).trim().replace(/\s+/g, " ");
+    return s === s.toLowerCase() ? s.replace(/(^|[\s'-])(\p{L})/gu, function (m, a, b) { return a + b.toUpperCase(); }) : s;
+  }
+  function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+  function personKey(s) { return "n:" + norm(s.autore || "anonimo"); }
+  function memGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function memSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function setStatus(msg, isErr) { var s = $("status"); s.textContent = msg || ""; s.className = "status" + (isErr ? " err" : ""); }
+  function showNote(msg, ok) { var n = $("note"); n.textContent = msg; n.className = "note" + (ok ? " ok" : ""); n.hidden = false; }
+  function hideNote() { $("note").hidden = true; }
+
+  // testo scritto -> paese UE, città (con il suo paese) oppure meta fuori mappa
+  var LOOKUP = {};
+  Object.keys(COUNTRIES).forEach(function (c) { LOOKUP[norm(COUNTRIES[c])] = { code: c }; });
+  Object.keys(ALIASES).forEach(function (c) { ALIASES[c].forEach(function (a) { LOOKUP[norm(a)] = { code: c }; }); });
+  LOOKUP["repubblica ceca"] = { code: "CZ" };
+  Object.keys(CITIES).forEach(function (c) { CITIES[c].forEach(function (n) { LOOKUP[norm(n)] = { code: c, city: n }; }); });
+  function resolve(text) {
+    var hit = LOOKUP[norm(text)];
+    return hit ? hit : { text: pretty(text) };
+  }
+
+  // ---------- mappa ----------
+  function buildMap(host, label, onPick) {
+    var root = svg("svg", { viewBox: "0 0 " + MAP.w + " " + MAP.h, role: "group", "aria-label": label });
+    root.appendChild(svg("rect", { width: MAP.w, height: MAP.h, class: "sea" }));
+    root.appendChild(svg("path", { d: MAP.context, class: "ctx" }));
+    var nodes = {};
+    MAP.countries.forEach(function (c) {
+      var g = svg("g", { class: "eu", tabindex: "0", role: "button", "data-code": c.code });
+      var title = svg("title");
+      g.appendChild(title);
+      g.appendChild(svg("path", { d: c.d }));
+      var tiny = c.code === "MT" || c.code === "LU";
+      if (tiny) g.appendChild(svg("circle", { cx: c.cx, cy: c.cy, r: 13, class: "ring" }));
+      var t = svg("text", { x: c.cx, y: c.cy + (tiny ? -21 : 0), class: "lbl" });
+      g.appendChild(t);
+      g.addEventListener("click", function () { onPick(c.code); });
+      g.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(c.code); }
+      });
+      root.appendChild(g);
+      nodes[c.code] = { g: g, title: title, text: t };
+    });
+    host.appendChild(root);
+    // state(code) -> { fill, on, label, light, title, selected, pressed }
+    return function update(state) {
+      Object.keys(nodes).forEach(function (code) {
+        var n = nodes[code], st = state(code);
+        n.g.classList.toggle("on", !!st.on);
+        n.g.classList.toggle("sel", !!st.selected);
+        if (st.fill) n.g.style.setProperty("--fill", st.fill); else n.g.style.removeProperty("--fill");
+        n.g.setAttribute("aria-pressed", st.pressed ? "true" : "false");
+        n.g.setAttribute("aria-label", st.title);
+        n.title.textContent = st.title;
+        n.text.textContent = st.label || "";
+        n.text.setAttribute("class", "lbl" + (st.light ? " light" : ""));
+      });
+    };
+  }
+
+  // ---------- aggregazione ----------
+  function aggregate() {
+    var by = {}, people = {}, names = {};
+    subs.forEach(function (s) {
+      var pk = personKey(s);
+      people[pk] = true;
+      names[pk] = s.autore || "Anonimo";
+      function add(key, code, name, city) {
+        var g = by[key] || (by[key] = { key: key, code: code, name: name, people: {}, cities: {} });
+        g.people[pk] = true;
+        if (city) g.cities[city] = true;
+      }
+      (s.paesi || []).forEach(function (c) {
+        if (!COUNTRIES[c]) return;
+        add("c:" + c, c, COUNTRIES[c]);
+      });
+      Object.keys(s.citta || {}).forEach(function (c) {
+        if (!COUNTRIES[c]) return;
+        (s.citta[c] || []).forEach(function (city) { add("c:" + c, c, COUNTRIES[c], city); });
+      });
+      (s.altri || []).forEach(function (t) {
+        var k = norm(t);
+        if (k) add("x:" + k, null, pretty(t));
+      });
+    });
+    var list = Object.keys(by).map(function (k) {
+      var g = by[k];
+      g.count = Object.keys(g.people).length;
+      g.who = Object.keys(g.people).map(function (pk) { return names[pk]; }).sort(function (a, b) { return a.localeCompare(b, "it"); });
+      g.cityList = Object.keys(g.cities).sort(function (a, b) { return a.localeCompare(b, "it"); });
+      return g;
+    });
+    list.sort(function (a, b) { return b.count - a.count || a.name.localeCompare(b.name, "it"); });
+    return { list: list, people: Object.keys(people).length };
+  }
+
+  // ---------- render: scelta ----------
+  var updatePick, updateRes;
+
+  function renderPick() {
+    updatePick(function (code) {
+      var on = !!sel[code];
+      return { on: on, selected: false, label: on ? "✓" : "", light: true, pressed: on,
+               title: COUNTRIES[code] + (on ? ", scelto" : "") };
+    });
+    var box = $("picked");
+    box.textContent = "";
+    var any = false;
+    Object.keys(sel).sort(function (a, b) { return COUNTRIES[a].localeCompare(COUNTRIES[b], "it"); }).forEach(function (code) {
+      any = true;
+      var txt = COUNTRIES[code] + (cityOf[code] && cityOf[code].length ? " (" + cityOf[code].join(", ") + ")" : "");
+      box.appendChild(pill(txt, "", "Togli " + COUNTRIES[code], function () { delete sel[code]; delete cityOf[code]; renderPick(); }));
+    });
+    free.forEach(function (t, i) {
+      any = true;
+      box.appendChild(pill(t, "free", "Togli " + t, function () { free.splice(i, 1); renderPick(); }));
+    });
+    if (!any) box.appendChild(h("span", "none", "Nessuna meta ancora. Tocca la mappa o scrivi qui sopra."));
+    Array.prototype.forEach.call($("chips-all").children, function (b) {
+      b.setAttribute("aria-pressed", sel[b.dataset.code] ? "true" : "false");
+    });
+  }
+  function pill(text, cls, label, onRemove) {
+    var p = h("span", "pill" + (cls ? " " + cls : ""));
+    p.appendChild(document.createTextNode(text));
+    var b = h("button", null, "×");
+    b.type = "button";
+    b.setAttribute("aria-label", label);
+    b.addEventListener("click", onRemove);
+    p.appendChild(b);
+    return p;
+  }
+  function togglePick(code) {
+    if (!COUNTRIES[code]) return;
+    if (sel[code]) { delete sel[code]; delete cityOf[code]; } else sel[code] = true;
+    setStatus("");
+    renderPick();
+  }
+  function addTyped() {
+    var input = $("f-testo");
+    var text = input.value.trim().replace(/\s+/g, " ");
+    if (!text) return;
+    var r = resolve(text);
+    if (r.code) {
+      sel[r.code] = true;
+      if (r.city) {
+        var arr = cityOf[r.code] || (cityOf[r.code] = []);
+        if (arr.indexOf(r.city) < 0) arr.push(r.city);
+      }
+    } else {
+      if (!norm(r.text)) { setStatus("Scrivi il nome di un paese o di una città.", true); return; }
+      var dup = free.some(function (f) { return norm(f) === norm(r.text); });
+      if (!dup) {
+        if (free.length >= 5) { setStatus("Puoi aggiungere al massimo 5 mete fuori mappa.", true); return; }
+        free.push(r.text);
+      }
+    }
+    input.value = "";
+    setStatus("");
+    renderPick();
+  }
+
+  // ---------- render: risultati ----------
+  function renderResults() {
+    var agg = aggregate(), list = agg.list;
+    var byCode = {};
+    list.forEach(function (g) { if (g.code) byCode[g.code] = g; });
+    var max = list.length ? list[0].count : 0;
+
+    var stats = $("stats");
+    stats.textContent = "";
+    [[agg.people, agg.people === 1 ? "compagno" : "compagni"], [list.length, list.length === 1 ? "meta" : "mete"]].forEach(function (x) {
+      var s = h("span");
+      s.appendChild(h("b", null, String(x[0])));
+      s.appendChild(document.createTextNode(x[1]));
+      stats.appendChild(s);
+    });
+    $("legend-max").textContent = max ? "Più scelto (" + max + ")" : "Più scelto";
+
+    updateRes(function (code) {
+      var g = byCode[code];
+      if (!g) return { on: false, selected: openCode === code, label: "", pressed: openCode === code, title: COUNTRIES[code] + ", nessuna scelta" };
+      var pct = Math.round(18 + 82 * g.count / max);
+      return { fill: "color-mix(in srgb, var(--sign) " + pct + "%, var(--eu))", selected: openCode === code,
+               label: String(g.count), light: pct > 55, pressed: openCode === code,
+               title: COUNTRIES[code] + ": " + plural(g.count, "compagno", "compagni") };
+    });
+
+    renderDetail(byCode[openCode]);
+
+    var rows = $("rows");
+    rows.textContent = "";
+    if (!list.length) {
+      var li = h("li", "empty");
+      li.appendChild(h("b", null, "Nessuna scelta per ora"));
+      li.appendChild(h("p", null, "Importa i messaggi dei compagni qui sopra: la classifica compare e la mappa si colora."));
+      rows.appendChild(li);
+    }
+    list.forEach(function (g, i) {
+      var li = h("li", "row");
+      li.appendChild(h("div", "rank", String(i + 1)));
+      var name = h("div", "name", g.name);
+      if (i === 0 && max > 1 && (!list[1] || list[1].count < max)) name.appendChild(h("span", "tag-lead", "in testa"));
+      li.appendChild(name);
+      var c = h("div", "count", String(g.count));
+      c.appendChild(h("small", null, g.count === 1 ? "voto" : "voti"));
+      li.appendChild(c);
+      var meta = [];
+      if (g.cityList.length) meta.push(g.cityList.join(", "));
+      if (!g.code) meta.push("fuori mappa");
+      meta.push(g.who.slice(0, 8).join(", ") + (g.who.length > 8 ? " e altri " + (g.who.length - 8) : ""));
+      li.appendChild(h("div", "meta", meta.join(" · ")));
+      var bar = h("div", "bar");
+      var fill = h("i");
+      fill.style.width = Math.max(4, Math.round(g.count / max * 100)) + "%";
+      bar.appendChild(fill);
+      li.appendChild(bar);
+      rows.appendChild(li);
+    });
+
+    var ul = $("props");
+    ul.textContent = "";
+    if (!subs.length) ul.appendChild(h("li", "none", "Le scelte importate compariranno qui, con nome e motivo."));
+    subs.slice().sort(function (a, b) { return (b.t || 0) - (a.t || 0); }).forEach(function (s) {
+      var li = h("li", "prop");
+      li.appendChild(h("div", "who", s.autore || "Anonimo"));
+      if ((uid && s.uid === uid) || isAdmin) {
+        var d = h("button", "del", "Elimina");
+        d.type = "button";
+        d.addEventListener("click", function () { armDelete(d, s.id); });
+        li.appendChild(d);
+      }
+      var parts = [];
+      (s.paesi || []).forEach(function (c) {
+        if (!COUNTRIES[c]) return;
+        var cs = s.citta && s.citta[c];
+        parts.push(COUNTRIES[c] + (cs && cs.length ? " (" + cs.join(", ") + ")" : ""));
+      });
+      (s.altri || []).forEach(function (t) { parts.push(t); });
+      li.appendChild(h("div", "dest", parts.join(" · ") || "Nessuna meta"));
+      if (s.motivo) li.appendChild(h("p", "why", "“" + s.motivo + "”"));
+      ul.appendChild(li);
+    });
+  }
+  function renderDetail(g) {
+    var box = $("detail");
+    box.textContent = "";
+    if (!openCode) { box.appendChild(h("p", null, "Tocca un paese sulla mappa per vedere chi lo ha scelto.")); return; }
+    box.appendChild(h("b", null, COUNTRIES[openCode]));
+    if (!g) { box.appendChild(h("p", null, "Nessuno lo ha scelto per ora.")); return; }
+    box.appendChild(h("p", null, plural(g.count, "compagno", "compagni") + ": " + g.who.join(", ") + (g.cityList.length ? ". Luoghi: " + g.cityList.join(", ") : "") + "."));
+  }
+
+  // ---------- salvataggio locale e codici ----------
+  function loadSubs() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { storeOk = false; return []; }
+  }
+  function saveSubs() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(subs)); storeOk = true; } catch (e) { storeOk = false; }
+    if (!storeOk) showNote("Il browser non permette di salvare: le scelte importate si perdono se chiudi la pagina.");
+  }
+  function b64enc(str) {
+    return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64dec(str) {
+    str = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (str.length % 4) str += "=";
+    return decodeURIComponent(escape(atob(str)));
+  }
+  function encodeDoc(d) {
+    var o = { a: d.autore, p: d.paesi, t: d.t };
+    if (d.citta) o.c = d.citta;
+    if (d.altri) o.x = d.altri;
+    if (d.motivo) o.m = d.motivo;
+    return "GITA:" + b64enc(JSON.stringify(o));
+  }
+  // codice -> scelta valida oppure null (i codici arrivano da altri: si controlla tutto)
+  function decodeDoc(code) {
+    var o;
+    try { o = JSON.parse(b64dec(code)); } catch (e) { return null; }
+    if (!o || typeof o.a !== "string" || !o.a.trim() || !Array.isArray(o.p)) return null;
+    var d = { autore: o.a.trim().slice(0, 40), t: typeof o.t === "number" ? o.t : Date.now(), paesi: [] };
+    o.p.forEach(function (c) { if (COUNTRIES[c] && d.paesi.indexOf(c) < 0) d.paesi.push(c); });
+    if (o.c && typeof o.c === "object") {
+      var citta = {};
+      Object.keys(o.c).forEach(function (c) {
+        if (!COUNTRIES[c] || !Array.isArray(o.c[c])) return;
+        var arr = o.c[c].filter(function (x) { return typeof x === "string" && x.trim(); }).slice(0, 8).map(function (x) { return x.trim().slice(0, 40); });
+        if (arr.length) citta[c] = arr;
+      });
+      if (Object.keys(citta).length) d.citta = citta;
+    }
+    if (Array.isArray(o.x)) {
+      var altri = o.x.filter(function (x) { return typeof x === "string" && norm(x); }).slice(0, 5).map(function (x) { return x.trim().slice(0, 40); });
+      if (altri.length) d.altri = altri;
+    }
+    if (typeof o.m === "string" && o.m.trim()) d.motivo = o.m.trim().slice(0, 240);
+    if (!d.paesi.length && !d.altri) return null;
+    d.id = norm(d.autore).replace(/ /g, "-") || "anonimo";
+    return d;
+  }
+  function describe(d) {
+    var parts = [];
+    d.paesi.forEach(function (c) {
+      var cs = d.citta && d.citta[c];
+      parts.push(COUNTRIES[c] + (cs && cs.length ? " (" + cs.join(", ") + ")" : ""));
+    });
+    (d.altri || []).forEach(function (t) { parts.push(t); });
+    return parts.join(", ");
+  }
+  // una scelta per nome: se lo stesso compagno rimanda, vale l'ultima
+  function mergeSubs(list) {
+    var added = 0;
+    list.forEach(function (d) {
+      var i = subs.findIndex(function (s) { return s.id === d.id; });
+      if (i < 0) { subs.push(d); added++; }
+      else if ((subs[i].t || 0) < d.t) { subs[i] = d; added++; }
+    });
+    saveSubs();
+    return added;
+  }
+
+  // ---------- azioni ----------
+  function armDelete(btn, id) {
+    if (!btn.classList.contains("armed")) {
+      btn.classList.add("armed");
+      btn.textContent = "Conferma";
+      setTimeout(function () { if (btn.isConnected) { btn.classList.remove("armed"); btn.textContent = "Elimina"; } }, 3500);
+      return;
+    }
+    subs = subs.filter(function (s) { return s.id !== id; });
+    saveSubs();
+    renderResults();
+  }
+
+  var lastMessage = "";
+  $("form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    addTyped(); // se c'è testo non ancora aggiunto, lo conta
+    var autore = $("f-autore").value.trim().replace(/\s+/g, " ");
+    var codes = Object.keys(sel);
+    if (!autore) { setStatus("Scrivi il tuo nome.", true); return; }
+    if (!codes.length && !free.length) { setStatus("Scegli almeno una meta sulla mappa o scrivila.", true); return; }
+    var doc = { autore: autore, t: Date.now(), paesi: codes };
+    var citta = {};
+    codes.forEach(function (c) { if (cityOf[c] && cityOf[c].length) citta[c] = cityOf[c]; });
+    if (Object.keys(citta).length) doc.citta = citta;
+    if (free.length) doc.altri = free.slice();
+    var motivo = $("f-motivo").value.trim();
+    if (motivo) doc.motivo = motivo.slice(0, 240);
+    memSet("gita-autore", autore);
+    lastMessage = "Gita di classe, scelta di " + autore + ": " + describe(doc) + "\nCodice: " + encodeDoc(doc);
+    $("code-out").value = lastMessage;
+    $("wa").href = "https://wa.me/?text=" + encodeURIComponent(lastMessage);
+    $("copystatus").textContent = "";
+    $("codebox").hidden = false;
+    setStatus("Fatto. Ora copia il messaggio e mandalo.");
+    $("codebox").scrollIntoView({ block: "nearest" });
+  });
+  $("copy").addEventListener("click", function () {
+    var out = $("code-out");
+    function fallback() {
+      out.focus(); out.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      $("copystatus").textContent = ok ? "Copiato." : "Seleziona il testo e copialo a mano.";
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastMessage).then(function () { $("copystatus").textContent = "Copiato."; }, fallback);
+    } else fallback();
+  });
+  $("import").addEventListener("click", function () {
+    var text = $("paste").value;
+    var found = text.match(/GITA:[A-Za-z0-9_-]+/g) || [];
+    if (!found.length) { $("impstatus").textContent = "Non trovo nessun codice. Incolla i messaggi completi, con la riga \"Codice: GITA:…\"."; $("impstatus").className = "status err"; return; }
+    var ok = [], bad = 0;
+    found.forEach(function (f) { var d = decodeDoc(f.slice(5)); if (d) ok.push(d); else bad++; });
+    var added = mergeSubs(ok);
+    $("impstatus").className = "status" + (bad ? " err" : "");
+    $("impstatus").textContent = plural(added, "scelta importata", "scelte importate") + (bad ? ", " + plural(bad, "codice non valido", "codici non validi") + " (forse copiato a metà)" : "") + ".";
+    if (ok.length) $("paste").value = "";
+    renderResults();
+  });
+  var clearArmed = false;
+  $("clear").addEventListener("click", function () {
+    var b = $("clear");
+    if (!clearArmed) {
+      clearArmed = true; b.textContent = "Conferma: cancella tutto";
+      setTimeout(function () { clearArmed = false; b.textContent = "Cancella tutto"; }, 3500);
+      return;
+    }
+    clearArmed = false; b.textContent = "Cancella tutto";
+    subs = []; saveSubs(); renderResults();
+    $("impstatus").className = "status"; $("impstatus").textContent = "Tutte le scelte importate sono state cancellate.";
+  });
+  $("add").addEventListener("click", addTyped);
+  $("f-testo").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addTyped(); } });
+
+  // ---------- schede ----------
+  function show(v) {
+    view = v;
+    $("view-scegli").hidden = v !== "scegli";
+    $("view-risultati").hidden = v !== "risultati";
+    $("tab-scegli").setAttribute("aria-pressed", v === "scegli" ? "true" : "false");
+    $("tab-risultati").setAttribute("aria-pressed", v === "risultati" ? "true" : "false");
+    try { if (location.hash !== "#" + v) location.hash = v; } catch (e) {}
+  }
+  $("tab-scegli").addEventListener("click", function () { hideNote(); show("scegli"); notesForAccess(); });
+  $("tab-risultati").addEventListener("click", function () { hideNote(); show("risultati"); notesForAccess(); });
+  window.addEventListener("hashchange", function () {
+    var v = location.hash === "#risultati" ? "risultati" : location.hash === "#scegli" ? "scegli" : null;
+    if (v && v !== view) show(v);
+  });
+
+  function notesForAccess() {}
+
+  // ---------- avvio ----------
+  var dl = $("dl-mete");
+  Object.keys(COUNTRIES).map(function (c) { return COUNTRIES[c]; }).sort(function (a, b) { return a.localeCompare(b, "it"); })
+    .forEach(function (n) { var o = document.createElement("option"); o.value = n; dl.appendChild(o); });
+  var allCities = [];
+  Object.keys(CITIES).forEach(function (c) { CITIES[c].forEach(function (n) { allCities.push(n); }); });
+  allCities.sort(function (a, b) { return a.localeCompare(b, "it"); }).forEach(function (n) { var o = document.createElement("option"); o.value = n; dl.appendChild(o); });
+
+  var chips = $("chips-all");
+  Object.keys(COUNTRIES).sort(function (a, b) { return COUNTRIES[a].localeCompare(COUNTRIES[b], "it"); }).forEach(function (c) {
+    var b = h("button", "tog", COUNTRIES[c]);
+    b.type = "button";
+    b.dataset.code = c;
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", function () { togglePick(c); });
+    chips.appendChild(b);
+  });
+
+  updatePick = buildMap($("map-pick"), "Mappa dell'Unione Europea: tocca i paesi che vuoi scegliere", togglePick);
+  updateRes = buildMap($("map-res"), "Mappa dell'Unione Europea colorata in base alle scelte", function (code) {
+    openCode = openCode === code ? null : code;
+    renderResults();
+  });
+
+  $("f-autore").value = memGet("gita-autore") || "";
+  renderPick();
+  if (location.hash === "#risultati") show("risultati");
+
+  subs = loadSubs();
+  renderResults();
+  $("importbox").open = !subs.length;
+  if (!storeOk) showNote("Il browser non permette di salvare: le scelte importate si perdono se chiudi la pagina.");
+})();
+</script>
