@@ -1,0 +1,488 @@
+<title>Meta della gita</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: cartello autostradale verde con la classifica (colonna larga) + modulo di proposta (colonna stretta, sticky). */
+:root {
+  --bg: #eef2ee;
+  --surface: #ffffff;
+  --ink: #14231b;
+  --muted: #55665c;
+  --line: #cfd9d1;
+  --sign: #0d5c3a;
+  --sign-track: #0a4a2f;
+  --sign-ink: #f4f8f4;
+  --sign-dim: #a9cdb8;
+  --accent: #f2c230;
+  --accent-ink: #2a2100;
+  --danger: #b3261e;
+  --focus: #1a6fdb;
+  --font-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1612;
+    --surface: #16211b;
+    --ink: #e8efe9;
+    --muted: #9db0a4;
+    --line: #2a3a31;
+    --sign: #0f6b43;
+    --sign-track: #0b4f31;
+    --danger: #ff8a80;
+    --focus: #6ea8ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1612;
+  --surface: #16211b;
+  --ink: #e8efe9;
+  --muted: #9db0a4;
+  --line: #2a3a31;
+  --sign: #0f6b43;
+  --sign-track: #0b4f31;
+  --danger: #ff8a80;
+  --focus: #6ea8ff;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+}
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.wrap { max-width: 1040px; margin-inline: auto; display: grid; gap: 24px; }
+header { display: grid; gap: 6px; }
+.eyebrow {
+  font-family: var(--font-display); font-weight: 600; text-transform: uppercase;
+  letter-spacing: .12em; font-size: 14px; color: var(--muted);
+}
+h1 {
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(38px, 8vw, 64px);
+  line-height: .98; margin: 0; text-wrap: balance;
+}
+.lead { margin: 4px 0 0; color: var(--muted); max-width: 60ch; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; font-variant-numeric: tabular-nums; }
+.stats span { color: var(--muted); font-size: 14px; }
+.stats b { font-family: var(--font-display); font-size: 22px; color: var(--ink); margin-right: 4px; }
+
+.cols { display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) {
+  .cols { grid-template-columns: minmax(0, 1fr) 340px; }
+  .side { position: sticky; top: 16px; }
+}
+.main { display: grid; gap: 28px; min-width: 0; }
+.side { min-width: 0; order: -1; }
+@media (min-width: 900px) { .side { order: 0; } }
+
+/* Cartello classifica */
+.board { background: var(--sign); color: var(--sign-ink); border-radius: 6px; padding: 18px 16px 8px; box-shadow: inset 0 0 0 3px var(--sign), inset 0 0 0 5px var(--sign-ink); }
+.board-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 6px 10px 12px; }
+.board-head h2 { font-family: var(--font-display); font-size: 26px; text-transform: uppercase; letter-spacing: .06em; margin: 0; }
+.board-head span { font-size: 13px; color: var(--sign-dim); }
+.rows { list-style: none; margin: 0; padding: 0; }
+.row {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 4px 12px;
+  align-items: center; padding: 12px 10px; border-top: 1px solid rgba(244, 248, 244, .22);
+}
+.rank { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.row .name { font-family: var(--font-display); font-weight: 700; font-size: 26px; line-height: 1.05; overflow-wrap: anywhere; }
+.row .meta { grid-column: 2; font-size: 13.5px; color: var(--sign-dim); }
+.tag-lead {
+  display: inline-block; vertical-align: middle; margin-left: 8px; padding: 1px 7px;
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600;
+  background: var(--accent); color: var(--accent-ink); border-radius: 3px;
+}
+.bar { grid-column: 2 / 4; height: 8px; background: var(--sign-track); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; min-width: 6px; }
+.vote-box { grid-column: 3; grid-row: 1 / 3; display: grid; justify-items: center; gap: 4px; }
+.count { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.count small { font-size: 13px; font-weight: 600; color: var(--sign-dim); margin-left: 3px; letter-spacing: .04em; }
+.vote-btn {
+  border: 2px solid var(--sign-ink); background: transparent; color: var(--sign-ink);
+  border-radius: 999px; padding: 6px 14px; min-height: 40px; cursor: pointer; font-weight: 600; font-size: 14px;
+}
+.vote-btn:hover:not(:disabled) { background: rgba(244, 248, 244, .14); }
+.vote-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.vote-btn:disabled { opacity: .6; cursor: default; }
+.board :focus-visible { outline-color: var(--accent); }
+
+.empty { padding: 26px 10px 30px; border-top: 1px solid rgba(244, 248, 244, .22); }
+.empty b { font-family: var(--font-display); font-size: 24px; display: block; }
+.empty p { margin: 4px 0 0; color: var(--sign-dim); max-width: 44ch; }
+
+/* Elenco proposte */
+h2.sec { font-family: var(--font-display); font-size: 26px; letter-spacing: .02em; margin: 0 0 10px; }
+.props { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.prop { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+.prop .dest { font-weight: 600; font-size: 18px; overflow-wrap: anywhere; }
+.prop .who { color: var(--muted); font-size: 14px; }
+.prop .why { grid-column: 1 / -1; margin: 4px 0 0; overflow-wrap: anywhere; }
+.chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { font-size: 13px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.del { align-self: start; border: 1px solid var(--line); background: transparent; border-radius: 6px; padding: 4px 10px; min-height: 36px; cursor: pointer; color: var(--muted); font-size: 14px; }
+.del:hover { border-color: var(--danger); color: var(--danger); }
+.del.armed { border-color: var(--danger); background: var(--danger); color: var(--surface); }
+.none { color: var(--muted); padding: 14px 2px; border-top: 1px solid var(--line); margin: 0; }
+
+/* Modulo */
+details.form { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+details.form > summary {
+  list-style: none; cursor: pointer; padding: 14px 16px; min-height: 48px;
+  font-family: var(--font-display); font-weight: 700; font-size: 24px; display: flex; justify-content: space-between; align-items: center;
+}
+details.form > summary::-webkit-details-marker { display: none; }
+details.form > summary::after { content: "+"; font-size: 28px; line-height: 1; color: var(--muted); }
+details.form[open] > summary::after { content: "–"; }
+form { display: grid; gap: 14px; padding: 4px 16px 18px; }
+label { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
+label .opt { font-weight: 400; color: var(--muted); }
+input, select, textarea {
+  width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); font-weight: 400; font-size: 16px;
+}
+textarea { resize: vertical; min-height: 76px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.submit {
+  border: 0; border-radius: 6px; background: var(--sign); color: var(--sign-ink); cursor: pointer;
+  font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: .04em; text-transform: uppercase;
+  padding: 10px 16px; min-height: 48px;
+}
+.submit:hover:not(:disabled) { filter: brightness(1.12); }
+.submit:disabled { opacity: .55; cursor: default; }
+.status { min-height: 1.4em; font-size: 14px; margin: 0; color: var(--muted); }
+.status.err { color: var(--danger); }
+.note { margin: 0; padding: 12px 16px; border-left: 4px solid var(--accent); background: var(--surface); font-size: 14px; }
+@media (prefers-reduced-motion: no-preference) {
+  .bar i { transition: width .35s ease; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Gita di classe</div>
+    <h1>Dove andiamo in gita?</h1>
+    <p class="lead">Scrivi la meta che vorresti, poi appoggia quelle degli altri. La classifica si aggiorna da sola ogni volta che qualcuno propone o vota.</p>
+    <div class="stats" id="stats" aria-live="polite"></div>
+  </header>
+
+  <p class="note" id="note" hidden></p>
+
+  <div class="cols">
+    <div class="main">
+      <section class="board" aria-labelledby="board-title">
+        <div class="board-head">
+          <h2 id="board-title">Classifica mete</h2>
+          <span>1 punto per ogni compagno che la vuole</span>
+        </div>
+        <ol class="rows" id="rows"></ol>
+      </section>
+
+      <section aria-labelledby="props-title">
+        <h2 class="sec" id="props-title">Chi ha proposto cosa</h2>
+        <ul class="props" id="props"></ul>
+      </section>
+    </div>
+
+    <aside class="side">
+      <details class="form" id="formbox">
+        <summary>Proponi una meta</summary>
+        <form id="form" autocomplete="off">
+          <label for="f-autore">Il tuo nome
+            <input id="f-autore" name="autore" maxlength="40" required>
+          </label>
+          <label for="f-dest">Meta
+            <input id="f-dest" name="dest" maxlength="60" placeholder="Es. Barcellona, Dolomiti, Napoli" required>
+          </label>
+          <label for="f-tipo">Tipo di gita
+            <select id="f-tipo" name="tipo">
+              <option value="Città d'arte">Città d'arte</option>
+              <option value="Mare">Mare</option>
+              <option value="Montagna">Montagna</option>
+              <option value="Parco / avventura">Parco / avventura</option>
+              <option value="Estero">Estero</option>
+              <option value="Altro">Altro</option>
+            </select>
+          </label>
+          <div class="two">
+            <label for="f-giorni">Giorni <span class="opt">(facolt.)</span>
+              <input id="f-giorni" name="giorni" type="number" inputmode="numeric" min="1" max="14" step="1">
+            </label>
+            <label for="f-budget">€ a testa <span class="opt">(facolt.)</span>
+              <input id="f-budget" name="budget" type="number" inputmode="numeric" min="0" max="5000" step="10">
+            </label>
+          </div>
+          <label for="f-motivo">Perché proprio lì? <span class="opt">(facolt.)</span>
+            <textarea id="f-motivo" name="motivo" maxlength="240"></textarea>
+          </label>
+          <button class="submit" id="submit" type="submit">Aggiungi meta</button>
+          <p class="status" id="status" role="status"></p>
+        </form>
+      </details>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var db = null, uid = null, canWrite = true, isAdmin = false;
+  var proposals = [], votes = [];
+  var busy = {};
+
+  // ---------- utilità ----------
+  function h(tag, cls, text) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+  function norm(s) {
+    return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+  function groupKey(dest) {
+    return norm(dest).replace(/ /g, "-").slice(0, 60).replace(/-+$/, "");
+  }
+  function pretty(s) {
+    s = String(s).trim().replace(/\s+/g, " ");
+    return s === s.toLowerCase() ? s.replace(/(^|[\s'-])(\p{L})/gu, function (m, a, b) { return a + b.toUpperCase(); }) : s;
+  }
+  function safeSeg(s) { return String(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, "-"); }
+  function personKey(p) { return p.uid ? "u:" + p.uid : "n:" + norm(p.autore || "anonimo"); }
+  function avg(arr) {
+    var v = arr.filter(function (x) { return typeof x === "number" && isFinite(x); });
+    return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+  }
+  function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+  function setStatus(msg, isErr) {
+    var s = $("status");
+    s.textContent = msg || "";
+    s.className = "status" + (isErr ? " err" : "");
+  }
+  function memGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function memSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  // ---------- aggregazione ----------
+  function buildGroups() {
+    var map = {};
+    proposals.slice().sort(function (a, b) { return (a.t || 0) - (b.t || 0); }).forEach(function (p) {
+      var g = groupKey(p.dest || "");
+      if (!g) return;
+      var grp = map[g] || (map[g] = { key: g, name: pretty(p.dest), proposals: [], people: {}, tipi: {} });
+      grp.proposals.push(p);
+      grp.people[personKey(p)] = true;
+      if (p.tipo) grp.tipi[p.tipo] = (grp.tipi[p.tipo] || 0) + 1;
+    });
+    votes.forEach(function (v) {
+      if (map[v.g] && v.uid) map[v.g].people["u:" + v.uid] = true;
+    });
+    var list = Object.keys(map).map(function (k) {
+      var g = map[k];
+      g.score = Object.keys(g.people).length;
+      g.giorni = avg(g.proposals.map(function (p) { return p.giorni; }));
+      g.budget = avg(g.proposals.map(function (p) { return p.budget; }));
+      g.tipo = Object.keys(g.tipi).sort(function (a, b) { return g.tipi[b] - g.tipi[a]; })[0] || "";
+      return g;
+    });
+    list.sort(function (a, b) {
+      return b.score - a.score || b.proposals.length - a.proposals.length || a.name.localeCompare(b.name, "it");
+    });
+    return list;
+  }
+
+  // ---------- rendering ----------
+  function render() {
+    var groups = buildGroups();
+    var people = {};
+    proposals.forEach(function (p) { people[personKey(p)] = true; });
+    votes.forEach(function (v) { if (v.uid) people["u:" + v.uid] = true; });
+
+    var stats = $("stats");
+    stats.textContent = "";
+    [[Object.keys(people).length, "compagni"], [groups.length, "mete"], [proposals.length, "proposte"]].forEach(function (x) {
+      var s = h("span");
+      s.appendChild(h("b", null, String(x[0])));
+      s.appendChild(document.createTextNode(x[1]));
+      stats.appendChild(s);
+    });
+
+    var myVotes = {};
+    votes.forEach(function (v) { if (uid && v.uid === uid) myVotes[v.g] = true; });
+
+    var rows = $("rows");
+    rows.textContent = "";
+    if (!groups.length) {
+      var li = h("li", "empty");
+      li.appendChild(h("b", null, "Nessuna meta per ora"));
+      li.appendChild(h("p", null, "Compila il modulo e aggiungi la prima. Appena qualcuno propone, qui compare la classifica."));
+      rows.appendChild(li);
+    }
+    var top = groups.length ? groups[0].score : 1;
+    groups.forEach(function (g, i) {
+      var li = h("li", "row");
+      li.appendChild(h("div", "rank", String(i + 1)));
+      var name = h("div", "name", g.name);
+      if (i === 0 && g.score > 1 && (!groups[1] || groups[1].score < g.score)) name.appendChild(h("span", "tag-lead", "in testa"));
+      li.appendChild(name);
+
+      var bits = [plural(g.proposals.length, "proposta", "proposte")];
+      if (g.tipo) bits.push(g.tipo);
+      if (g.giorni != null) bits.push("circa " + plural(Math.round(g.giorni), "giorno", "giorni"));
+      if (g.budget != null) bits.push("circa " + Math.round(g.budget) + " € a testa");
+      li.appendChild(h("div", "meta", bits.join(" · ")));
+
+      var box = h("div", "vote-box");
+      var c = h("div", "count", String(g.score));
+      c.appendChild(h("small", null, g.score === 1 ? "voto" : "voti"));
+      box.appendChild(c);
+      var mine = g.people["u:" + uid];
+      var isProposer = g.proposals.some(function (p) { return uid && p.uid === uid; });
+      var btn = h("button", "vote-btn", isProposer ? "Tua meta" : myVotes[g.key] ? "Ci vengo" : "Ci vengo?");
+      btn.type = "button";
+      btn.setAttribute("aria-pressed", mine ? "true" : "false");
+      btn.disabled = !uid || !canWrite || isProposer || !!busy[g.key];
+      if (!uid) btn.title = "Serve un account per votare";
+      btn.addEventListener("click", function () { toggleVote(g.key); });
+      box.appendChild(btn);
+      li.appendChild(box);
+
+      var bar = h("div", "bar");
+      var fill = h("i");
+      fill.style.width = Math.max(4, Math.round(g.score / top * 100)) + "%";
+      bar.appendChild(fill);
+      li.appendChild(bar);
+      rows.appendChild(li);
+    });
+
+    var ul = $("props");
+    ul.textContent = "";
+    if (!proposals.length) {
+      var none = h("li", "none", "Le proposte dei compagni appariranno qui, con nome, budget e motivo.");
+      ul.appendChild(none);
+    }
+    proposals.slice().sort(function (a, b) { return (b.t || 0) - (a.t || 0); }).forEach(function (p) {
+      var li = h("li", "prop");
+      var left = h("div");
+      left.appendChild(h("div", "dest", pretty(p.dest || "")));
+      left.appendChild(h("div", "who", "Proposta di " + (p.autore || "anonimo")));
+      li.appendChild(left);
+      if ((uid && p.uid === uid) || isAdmin) {
+        var d = h("button", "del", "Elimina");
+        d.type = "button";
+        d.addEventListener("click", function () { armDelete(d, p.id); });
+        li.appendChild(d);
+      }
+      var chips = h("div", "chips");
+      if (p.tipo) chips.appendChild(h("span", "chip", p.tipo));
+      if (typeof p.giorni === "number") chips.appendChild(h("span", "chip", plural(p.giorni, "giorno", "giorni")));
+      if (typeof p.budget === "number") chips.appendChild(h("span", "chip", p.budget + " € a testa"));
+      if (chips.childNodes.length) li.appendChild(chips);
+      if (p.motivo) li.appendChild(h("p", "why", p.motivo));
+      ul.appendChild(li);
+    });
+  }
+
+  // ---------- azioni ----------
+  async function toggleVote(g) {
+    if (!db || !uid || busy[g]) return;
+    busy[g] = true; render();
+    try {
+      var ref = db.doc("votes/" + g + "_" + safeSeg(uid));
+      var has = votes.some(function (v) { return v.g === g && v.uid === uid; });
+      if (has) await ref.delete(); else await ref.set({ g: g, uid: uid, t: Date.now() });
+    } catch (e) {
+      setStatus("Voto non salvato. Riprova tra un attimo.", true);
+    }
+    busy[g] = false; render();
+  }
+
+  function armDelete(btn, id) {
+    if (!btn.classList.contains("armed")) {
+      btn.classList.add("armed");
+      btn.textContent = "Conferma";
+      setTimeout(function () { if (btn.isConnected) { btn.classList.remove("armed"); btn.textContent = "Elimina"; } }, 3500);
+      return;
+    }
+    btn.disabled = true;
+    db.doc("proposals/" + id).delete().catch(function () {
+      btn.disabled = false;
+      setStatus("Non sono riuscito a eliminare la proposta.", true);
+    });
+  }
+
+  $("form").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    if (!db || !canWrite) return;
+    var f = ev.target;
+    var autore = f.autore.value.trim().replace(/\s+/g, " ");
+    var dest = f.dest.value.trim().replace(/\s+/g, " ");
+    if (!autore || !groupKey(dest)) { setStatus("Scrivi il tuo nome e una meta con almeno una lettera.", true); return; }
+    var doc = { autore: autore, dest: dest, tipo: f.tipo.value, uid: uid || null, t: Date.now() };
+    var giorni = parseInt(f.giorni.value, 10), budget = parseFloat(f.budget.value);
+    if (isFinite(giorni) && giorni >= 1 && giorni <= 14) doc.giorni = giorni;
+    if (isFinite(budget) && budget >= 0 && budget <= 5000) doc.budget = Math.round(budget);
+    var motivo = f.motivo.value.trim();
+    if (motivo) doc.motivo = motivo.slice(0, 240);
+    $("submit").disabled = true;
+    setStatus("Salvo…");
+    try {
+      await db.collection("proposals").add(doc);
+      memSet("gita-autore", autore);
+      f.dest.value = ""; f.giorni.value = ""; f.budget.value = ""; f.motivo.value = "";
+      setStatus("Meta aggiunta. Ora compare in classifica.");
+      f.dest.focus();
+    } catch (e) {
+      setStatus(e && e.code === "quota_exceeded" ? "Troppe proposte salvate: chiedi di cancellarne qualcuna." : "Meta non salvata. Riprova tra un attimo.", true);
+    }
+    $("submit").disabled = !canWrite;
+  });
+
+  // ---------- avvio ----------
+  $("f-autore").value = memGet("gita-autore") || "";
+  $("formbox").open = window.matchMedia("(min-width: 900px)").matches;
+  render();
+
+  function showNote(msg) { var n = $("note"); n.textContent = msg; n.hidden = false; }
+
+  async function start() {
+    var c = window.claude;
+    if (!c || !c.use) { showNote("Apri questa pagina da claude.ai per proporre e votare: qui la modalità è solo anteprima."); return; }
+    var user = await c.use("user");
+    db = await c.use("db");
+    if (!db) { showNote("Il salvataggio condiviso non è disponibile in questa vista. Riapri il link da claude.ai."); return; }
+    if (user) {
+      uid = await user.id();
+      isAdmin = await user.canEdit();
+      var w = await user.can("data.write");
+      if (w === false) {
+        canWrite = false;
+        showNote("Puoi vedere le proposte ma non aggiungerne. Chi ha creato la pagina deve condividerla con te come Collaboratore.");
+      }
+    }
+    if (!uid && canWrite) showNote("Non risulti collegato a un account: puoi proporre ma non votare.");
+    $("submit").disabled = !canWrite;
+    Array.prototype.forEach.call($("form").elements, function (el) { if (el.id !== "submit") el.disabled = !canWrite; });
+
+    db.collection("proposals").onSnapshot(function (snap) {
+      proposals = snap.docs.map(function (d) { var x = d.data() || {}; x.id = d.id; return x; });
+      render();
+    }, function () { showNote("Connessione ai dati interrotta. Ricarica la pagina."); });
+    db.collection("votes").onSnapshot(function (snap) {
+      votes = snap.docs.map(function (d) { return d.data() || {}; });
+      render();
+    }, function () { showNote("Connessione ai dati interrotta. Ricarica la pagina."); });
+  }
+  start().catch(function () { showNote("Qualcosa non ha funzionato all'apertura. Ricarica la pagina."); });
+})();
+</script>
