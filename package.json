@@ -1,0 +1,14 @@
+{
+  "name": "decisione-gita",
+  "private": true,
+  "type": "module",
+  "description": "Pagina per scegliere la meta della gita di classe",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "d3-geo": "^3.1.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  }
+}
