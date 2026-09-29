@@ -184,6 +184,10 @@ h2.sec { font-family: var(--font-display); font-size: 26px; letter-spacing: .02e
 .codebtns .submit { flex: 1 1 140px; }
 a.addbtn { display: inline-flex; align-items: center; text-decoration: none; }
 details.import { margin-bottom: 18px; }
+.qrbox { display: grid; justify-items: center; gap: 6px; padding-top: 6px; }
+.qrsvg { background: #fff; padding: 12px; border-radius: 8px; width: min(100%, 340px); line-height: 0; }
+.qrsvg svg { width: 100%; height: auto; }
+.qrlink { overflow-wrap: anywhere; text-align: center; }
 .importin { display: grid; gap: 12px; padding: 4px 16px 16px; }
 </style>
 
@@ -259,9 +263,15 @@ details.import { margin-bottom: 18px; }
           <button class="submit" id="online-on" type="button">Attiva la raccolta online</button>
           <button class="submit" id="online-dl" type="button" hidden>Scarica il file per i compagni</button>
           <button class="addbtn" id="online-link" type="button" hidden>Copia il link</button>
+          <button class="addbtn" id="online-qr" type="button" hidden>Mostra il QR per la classe</button>
           <button class="addbtn" id="online-refresh" type="button" hidden>Aggiorna ora</button>
         </div>
         <p class="status" id="online-status" role="status"></p>
+        <div class="qrbox" id="qrbox" hidden>
+          <div class="qrsvg" id="qrsvg" role="img" aria-label="Codice QR con il link alla pagina"></div>
+          <p class="hint">Inquadra il codice con la fotocamera del telefono.</p>
+          <p class="hint qrlink" id="qrlink"></p>
+        </div>
       </div>
     </details>
     <details class="list import" id="importbox">
@@ -304,6 +314,7 @@ details.import { margin-bottom: 18px; }
 </div>
 
 <script>
+/*__QR__*/
 (function () {
   // Copia della pagina così com'è, prima che lo script la modifichi: serve a
   // generare il file per i compagni con l'archivio online già collegato.
@@ -790,8 +801,12 @@ details.import { margin-bottom: 18px; }
   function isOrg() { return !onlineId || memGet("gita-org") === onlineId; }
   async function refresh() {
     if (!onlineId) return;
-    var log = loadLog(), live = true, why = "";
-    try { log = mergeLog(log, await readLog()); saveLog(log); } catch (e) { live = false; why = e.message; }
+    var fresh = null, why = "";
+    try { fresh = await readLog(); } catch (e) { why = e.message; }
+    var live = !!fresh;
+    // rilegge la copia locale dopo l'attesa: un aggiornamento lento non deve cancellare uno più recente
+    var log = mergeLog(loadLog(), fresh || []);
+    if (live) saveLog(log);
     subs = reduceLog(log);
     var t = new Date();
     $("sync").textContent = live
@@ -808,10 +823,12 @@ details.import { margin-bottom: 18px; }
     $("online-dl").hidden = !onlineId;
     $("online-refresh").hidden = !onlineId;
     $("sync-refresh").hidden = !onlineId;
-    $("online-link").hidden = !(onlineId && /^https?:$/.test(location.protocol));
+    var web = /^https?:$/.test(location.protocol);
+    $("online-link").hidden = !(onlineId && web);
+    $("online-qr").hidden = !(onlineId && web);
     $("online-sum").textContent = onlineId ? "Raccolta online attiva" : "Raccolta online";
     $("online-text").textContent = onlineId
-      ? "Manda ai compagni il file che scarichi qui sotto, oppure il link se questa pagina è su un sito. Le loro scelte arrivano da sole. Il servizio le tiene 12 ore: questa pagina ne salva una copia su questo dispositivo ogni volta che si aggiorna, quindi aprila almeno una volta ogni 12 ore e usa sempre lo stesso dispositivo."
+      ? "Manda ai compagni il file che scarichi qui sotto, oppure il link se questa pagina è su un sito. Le loro scelte arrivano da sole. Il servizio le tiene 12 ore: questa pagina ne salva una copia su questo dispositivo ogni volta che si aggiorna, quindi aprila almeno una volta ogni 12 ore e usa sempre lo stesso dispositivo." + (/^https?:$/.test(location.protocol) ? " Per far entrare i compagni dal telefono: mostra il QR o manda il link."  : " Per avere un link e un QR da dare ai telefoni, apri questa pagina dal suo indirizzo online (GitHub Pages) e attiva la raccolta da lì.")
       : "Adesso le scelte arrivano solo se i compagni ti mandano il messaggio. Attiva la raccolta online: i compagni inviano direttamente dal file, senza fare altro.";
     $("submit").textContent = onlineId ? "Invia la mia scelta" : "Prepara il mio messaggio";
     $("lead").textContent = onlineId
@@ -849,11 +866,29 @@ details.import { margin-bottom: 18px; }
     $("online-status").className = "status";
     $("online-status").textContent = "File scaricato: gita-classe.html. Dallo ai compagni: si apre nel browser.";
   });
+  function shareLink() { return location.href.split("#")[0] + "#r=" + onlineId; }
   $("online-link").addEventListener("click", function () {
-    var link = location.href.split("#")[0] + "#r=" + onlineId;
+    var link = shareLink();
     var st = $("online-status");
     st.className = "status"; st.textContent = "Link: " + link;
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(function () { st.textContent = "Link copiato: " + link; }, function () {});
+  });
+  $("online-qr").addEventListener("click", function () {
+    var box = $("qrbox");
+    if (!box.hidden) { box.hidden = true; return; }
+    var link = shareLink();
+    try {
+      var qr = qrcode(0, "M");
+      qr.addData(link);
+      qr.make();
+      $("qrsvg").innerHTML = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+    } catch (e) {
+      $("online-status").className = "status err";
+      $("online-status").textContent = "Non riesco a creare il codice QR. Copia il link e mandalo.";
+      return;
+    }
+    $("qrlink").textContent = link;
+    box.hidden = false;
   });
   $("online-refresh").addEventListener("click", refresh);
   $("sync-refresh").addEventListener("click", refresh);
