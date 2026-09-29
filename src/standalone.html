@@ -310,6 +310,10 @@ details.import { margin-bottom: 18px; }
   var PRISTINE = "<!doctype html>\n" + document.documentElement.outerHTML;
   var ONLINE_ID = ""; // riempito nel file da distribuire ai compagni
   var NTFY = "https://ntfy.sh/";
+  // Se la pagina è dentro un'altra app (anteprima, riquadro) le connessioni vengono bloccate.
+  var cspBlocked = false;
+  document.addEventListener("securitypolicyviolation", function () { cspBlocked = true; });
+  function isEmbedded() { try { return window.self !== window.top; } catch (e) { return true; } }
 
   var MAP = /*__MAP__*/null;
 
@@ -828,7 +832,9 @@ details.import { margin-bottom: 18px; }
       startPolling();
     } catch (e) {
       st.className = "status err";
-      st.textContent = "Non riesco a raggiungere il servizio online (" + e.message + "). La rete potrebbe bloccarlo: prova con un'altra connessione, oppure continua con i messaggi.";
+      st.textContent = (cspBlocked || isEmbedded())
+        ? "Questa pagina è aperta dentro un'altra app, che blocca le connessioni. Salva il file sul dispositivo e aprilo direttamente in Chrome, Safari o Firefox (doppio clic sul file). Se è già nel browser, cambia rete."
+        : "Non riesco a raggiungere il servizio online (" + e.message + "). Prova a cambiare rete (per esempio i dati del telefono). Per controllare, apri https://ntfy.sh in una scheda: se non si apre, la rete lo blocca. Intanto puoi usare i messaggi.";
     }
     b.disabled = false;
   });
